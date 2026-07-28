@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     # ── Provider API Keys ───────────────────────────────────
     pexels_api_key: str = ""
     pixabay_api_key: str = ""
+    youtube_api_key: str = ""
 
     # ── Provider Toggles ────────────────────────────────────
     provider_local_enabled: bool = True
@@ -59,6 +60,10 @@ class Settings(BaseSettings):
     provider_youtube_enabled: bool = False
     provider_reddit_enabled: bool = True
     provider_unlimplay_enabled: bool = False
+
+    # ── Provider Weights ────────────────────────────────────
+    provider_youtube_weight: int = 20
+    provider_unlimplay_weight: int = 80
 
     # ── Queue ───────────────────────────────────────────────
     queue_min_size: int = 5

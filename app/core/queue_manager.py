@@ -164,9 +164,29 @@ class SmartQueue:
             logger.warning("No enabled providers available")
             return None
 
-        random.shuffle(providers)
+        # Weighted selection logic
+        ordered_providers = []
+        candidates = list(providers)
+        
+        cand_weights = []
+        for p in candidates:
+            if p.name == ProviderName.YOUTUBE:
+                cand_weights.append(settings.provider_youtube_weight)
+            elif p.name == ProviderName.UNLIMPLAY:
+                cand_weights.append(settings.provider_unlimplay_weight)
+            else:
+                cand_weights.append(50)  # Default weight for others
+                
+        while candidates:
+            total = sum(cand_weights)
+            if total <= 0:
+                idx = random.randint(0, len(candidates) - 1)
+            else:
+                idx = random.choices(range(len(candidates)), weights=cand_weights, k=1)[0]
+            ordered_providers.append(candidates.pop(idx))
+            cand_weights.pop(idx)
 
-        for provider in providers:
+        for provider in ordered_providers:
             try:
                 video = await provider.random(category=category)
                 if video and self._is_acceptable(video):
