@@ -116,7 +116,6 @@ class StreamEngine:
         cmd = [
             "ffmpeg", "-hide_banner", "-loglevel", "error",
             "-stream_loop", "-1",  # Loop infinitely
-            "-re",  # Real-time playback MUST be here for wallclock to work
             "-i", self._black_screen_path,
             "-c", "copy",
             "-f", "mpegts",
@@ -188,13 +187,22 @@ class StreamEngine:
             "-hide_banner",
             "-loglevel", "warning",
             "-stats",
-            "-use_wallclock_as_timestamps", "1",
             "-thread_queue_size", "10240",
+            "-re", # Pace reading from the pipe to real-time before encoding
             "-f", "mpegts",
-            "-fflags", "+genpts+igndts",
             "-i", "pipe:0",
+            # Re-encode to guarantee perfect timestamps and 100% gapless transitions
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-b:v", settings.bitrate,
+            "-maxrate", settings.bitrate,
+            "-bufsize", str(int(settings.bitrate.replace("k", "")) * 2) + "k",
+            "-g", str(settings.fps * 2),
+            "-c:a", "aac",
+            "-b:a", settings.audio_bitrate,
+            "-ar", "44100",
+            "-ac", "2",
             "-max_muxing_queue_size", "9999",
-            "-c", "copy"
         ]
 
         if settings.local_preview:
@@ -266,7 +274,6 @@ class StreamEngine:
             ])
 
         cmd.extend([
-            "-re", # MUST pace the output so Master's wallclock gives perfect timestamps
             "-thread_queue_size", "10240",
             # Input video
             "-i", input_source,
