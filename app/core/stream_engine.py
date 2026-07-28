@@ -152,10 +152,10 @@ class StreamEngine:
             # Video encoding
             "-c:v", "libx264",
             "-preset", settings.preset,
-            "-tune", "zerolatency",
+            "-tune", "film",
             "-b:v", settings.bitrate,
             "-maxrate", settings.bitrate,
-            "-bufsize", str(int(settings.bitrate.replace("k", "")) * 2) + "k",
+            "-bufsize", str(int(settings.bitrate.replace("k", "")) * 3) + "k",
             "-pix_fmt", "yuv420p",
             "-g", str(settings.fps * 2),
             "-r", str(settings.fps),
