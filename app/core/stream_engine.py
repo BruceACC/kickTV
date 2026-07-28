@@ -266,7 +266,6 @@ class StreamEngine:
             ])
 
         cmd.extend([
-            "-re", # Pace output to 1x speed so master wallclock timestamps are perfect
             "-thread_queue_size", "10240",
             # Input video
             "-i", input_source,
@@ -280,9 +279,10 @@ class StreamEngine:
             "-pix_fmt", "yuv420p",
             "-g", str(settings.fps * 2),
             "-r", str(settings.fps),
-            "-vf", f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black",
+            "-vf", f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black,fps={settings.fps},realtime",
             # Audio encoding
             "-c:a", "aac",
+            "-af", "arealtime",
             "-b:a", settings.audio_bitrate,
             "-ac", "2",
             "-ar", "44100",
