@@ -48,6 +48,8 @@ class StreamEngine:
         self._queue = video_queue or queue
         self._process: Optional[asyncio.subprocess.Process] = None
         self._master_process: Optional[asyncio.subprocess.Process] = None
+        self._gap_filler_process: Optional[asyncio.subprocess.Process] = None
+        self._gap_filler_task: Optional[asyncio.Task] = None
         self._status = StreamStatus()
         self._running = False
         self._stop_event = asyncio.Event()
@@ -56,6 +58,7 @@ class StreamEngine:
         self._max_reconnect_delay: float = 60.0
         self._consecutive_errors: int = 0
         self._max_consecutive_errors: int = 10
+        self._black_screen_path: Optional[str] = None
 
     @property
     def status(self) -> StreamStatus:
@@ -70,6 +73,101 @@ class StreamEngine:
     def is_running(self) -> bool:
         return self._running
 
+    async def _ensure_black_screen(self) -> str:
+        """Generate a short black screen + silent audio MPEG-TS file for gap filling."""
+        black_path = str(settings.abs_video_cache_dir / "black.ts")
+        import os
+        if os.path.exists(black_path) and os.path.getsize(black_path) > 0:
+            return black_path
+
+        w, h = settings.resolution_width, settings.resolution_height
+        cmd = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r={settings.fps}:d=2",
+            "-f", "lavfi", "-i", f"anullsrc=r=44100:cl=stereo",
+            "-t", "2",
+            "-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage",
+            "-b:v", "500k", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-ar", "44100",
+            "-f", "mpegts", black_path,
+        ]
+        logger.info("Generating black screen filler: %s", black_path)
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            logger.error("Failed to generate black screen: %s", stderr.decode(errors='replace'))
+        return black_path
+
+    async def _start_gap_filler(self) -> None:
+        """Start looping black screen video into the master process to keep connection alive."""
+        if not self._black_screen_path:
+            return
+        if self._gap_filler_process and self._gap_filler_process.returncode is None:
+            return  # Already running
+        if not self._master_process or self._master_process.returncode is not None:
+            return  # Master is dead, no point filling
+
+        cmd = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error",
+            "-stream_loop", "-1",  # Loop infinitely
+            "-re",  # Real-time playback
+            "-i", self._black_screen_path,
+            "-c", "copy",
+            "-f", "mpegts",
+            "pipe:1",
+        ]
+
+        async def _filler_pipe():
+            try:
+                self._gap_filler_process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                logger.info("[GAP] Black screen filler started")
+                while (self._gap_filler_process
+                       and self._gap_filler_process.stdout
+                       and not self._gap_filler_process.stdout.at_eof()):
+                    chunk = await self._gap_filler_process.stdout.read(65536)
+                    if not chunk:
+                        break
+                    if (self._master_process
+                            and self._master_process.stdin
+                            and self._master_process.returncode is None):
+                        try:
+                            self._master_process.stdin.write(chunk)
+                            await self._master_process.stdin.drain()
+                        except Exception:
+                            break
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.debug("Gap filler pipe ended: %s", e)
+            finally:
+                await self._stop_gap_filler()
+
+        self._gap_filler_task = asyncio.create_task(_filler_pipe())
+
+    async def _stop_gap_filler(self) -> None:
+        """Stop the gap filler process."""
+        if self._gap_filler_process and self._gap_filler_process.returncode is None:
+            try:
+                self._gap_filler_process.kill()
+                await self._gap_filler_process.wait()
+            except (ProcessLookupError, Exception):
+                pass
+        self._gap_filler_process = None
+
+        if self._gap_filler_task and not self._gap_filler_task.done():
+            self._gap_filler_task.cancel()
+            try:
+                await self._gap_filler_task
+            except (asyncio.CancelledError, Exception):
+                pass
+        self._gap_filler_task = None
+
     async def _start_master_process(self) -> bool:
         """Start the master FFmpeg process that connects to Kick."""
         if self._master_process and self._master_process.returncode is None:
@@ -82,8 +180,9 @@ class StreamEngine:
             "-hide_banner",
             "-loglevel", "warning",
             "-stats",
+            "-use_wallclock_as_timestamps", "1",
             "-f", "mpegts",
-            "-fflags", "+genpts",
+            "-fflags", "+genpts+igndts",
             "-i", "pipe:0",
             "-c", "copy"
         ]
@@ -358,23 +457,34 @@ class StreamEngine:
     async def _stream_loop(self) -> None:
         """
         Main streaming loop. Plays videos from the queue continuously.
-        Handles errors with exponential backoff.
+        Uses a gap filler (black screen) between videos to keep the
+        connection alive and prevent Kick from dropping the stream.
         """
         logger.info("[STREAM] Stream loop started")
         self._status.state = StreamState.LIVE
         self._status.started_at = datetime.utcnow()
 
+        # Pre-generate the black screen video
+        self._black_screen_path = await self._ensure_black_screen()
+        logger.info("[STREAM] Black screen ready at: %s", self._black_screen_path)
+
         while self._running and not self._stop_event.is_set():
-            # Get next video
+            # Start gap filler BEFORE fetching next video to keep connection alive
+            await self._start_gap_filler()
+
+            # Get next video (this may take a few seconds for API calls / URL extraction)
             video = await self._queue.next()
 
             if not video:
-                logger.warning("Queue empty. Waiting for content...")
+                logger.warning("Queue empty. Gap filler keeping stream alive...")
                 self._status.state = StreamState.RECONNECTING
+                # Keep gap filler running while we wait
                 await asyncio.sleep(5)
-                # Try to fill the queue
                 await self._queue.fill()
                 continue
+
+            # Stop gap filler right before playing the real video
+            await self._stop_gap_filler()
 
             # Play the video
             success = await self._play_video(video)
@@ -397,27 +507,33 @@ class StreamEngine:
                         source="stream_engine",
                         error_type="max_errors_reached",
                     )
+                    # Keep gap filler going during the pause
+                    await self._start_gap_filler()
                     await asyncio.sleep(30)
                     self._consecutive_errors = 0
                     continue
 
-                # Exponential backoff
+                # Exponential backoff — but keep gap filler alive
                 self._status.state = StreamState.RECONNECTING
                 logger.info(
                     "Reconnecting in %.1fs... (attempt %d)",
                     self._reconnect_delay,
                     self._consecutive_errors,
                 )
+                await self._start_gap_filler()
                 await asyncio.sleep(self._reconnect_delay)
                 self._reconnect_delay = min(
                     self._reconnect_delay * 2, self._max_reconnect_delay
                 )
-                # Master might be dead or the connection dropped, force restart
-                await self._kill_master_process()
+                # Only kill master if gap filler also failed
+                if self._master_process and self._master_process.returncode is not None:
+                    await self._kill_master_process()
             else:
                 self._status.total_videos_played += 1
                 self._status.state = StreamState.LIVE
 
+        # Clean up
+        await self._stop_gap_filler()
         logger.info("[STREAM] Stream loop ended")
         self._status.state = StreamState.STOPPED
 
@@ -452,7 +568,8 @@ class StreamEngine:
         self._running = False
         self._stop_event.set()
 
-        # Kill FFmpeg worker and master
+        # Kill gap filler, FFmpeg worker and master
+        await self._stop_gap_filler()
         await self._kill_ffmpeg()
         await self._kill_master_process()
 
