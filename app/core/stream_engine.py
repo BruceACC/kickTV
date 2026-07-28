@@ -89,7 +89,11 @@ class StreamEngine:
             "-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage",
             "-b:v", "500k", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-ar", "44100",
-            "-f", "mpegts", black_path,
+            "-f", "mpegts", 
+            "-mpegts_pmt_start_pid", "0x1000",
+            "-streamid", "0:0x100",
+            "-streamid", "1:0x101",
+            black_path,
         ]
         logger.info("Generating black screen filler: %s", black_path)
         proc = await asyncio.create_subprocess_exec(
@@ -277,6 +281,9 @@ class StreamEngine:
             "-ar", "44100",
             # Output format for pipe
             "-f", "mpegts",
+            "-mpegts_pmt_start_pid", "0x1000",
+            "-streamid", "0:0x100",
+            "-streamid", "1:0x101",
             "-muxdelay", "0",
             "-muxpreload", "0",
             "pipe:1"
