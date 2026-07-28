@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Proveedores{% endblock %}
+{% block page_title %}Gestión de Proveedores{% endblock %}
+
+{% block content %}
+<div class="page-content">
+    <div class="providers-grid" id="providers-grid">
+        <!-- Populated by JS -->
+        <div class="text-center text-muted py-5">
+            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+            Cargando proveedores...
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', loadProviders);
+
+const providerIcons = {
+    local: 'bi-folder-fill',
+    pexels: 'bi-camera-reels-fill',
+    pixabay: 'bi-image-fill',
+    archive: 'bi-archive-fill',
+    youtube: 'bi-youtube',
+    reddit: 'bi-reddit',
+    unlimplay: 'bi-film',
+};
+
+const providerColors = {
+    local: '#6c757d',
+    pexels: '#05A081',
+    pixabay: '#00AB6C',
+    archive: '#333',
+    youtube: '#FF0000',
+    reddit: '#FF4500',
+    unlimplay: '#9C27B0',
+};
+
+async function loadProviders() {
+    try {
+        const resp = await fetch('/api/providers');
+        const data = await resp.json();
+        const providers = data.data || [];
+        const grid = document.getElementById('providers-grid');
+
+        grid.innerHTML = providers.map(p => `
+            <div class="card glass-card provider-card ${p.enabled ? '' : 'provider-disabled'}" id="provider-${p.name}">
+                <div class="card-body">
+                    <div class="provider-header">
+                        <div class="provider-icon" style="background: ${providerColors[p.name] || '#6c757d'}20; color: ${providerColors[p.name] || '#6c757d'}">
+                            <i class="bi ${providerIcons[p.name] || 'bi-box'}"></i>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="toggle-${p.name}"
+                                ${p.enabled ? 'checked' : ''}
+                                onchange="toggleProvider('${p.name}', this.checked)">
+                        </div>
+                    </div>
+                    <h3 class="provider-name">${p.display_name || p.name}</h3>
+                    <p class="provider-desc">${p.description || ''}</p>
+                    ${p.requires_api_key && !p.has_api_key ? '<span class="badge bg-warning text-dark"><i class="bi bi-key"></i> API Key requerida</span>' : ''}
+                    <div class="provider-stats">
+                        <div class="pstat">
+                            <span class="pstat-value">${p.videos_served || 0}</span>
+                            <span class="pstat-label">Videos</span>
+                        </div>
+                        <div class="pstat">
+                            <span class="pstat-value text-danger">${p.errors || 0}</span>
+                            <span class="pstat-label">Errores</span>
+                        </div>
+                        <div class="pstat">
+                            <span class="pstat-value">${p.last_used ? new Date(p.last_used).toLocaleDateString('es') : '—'}</span>
+                            <span class="pstat-label">Último uso</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error('Error loading providers:', e);
+    }
+}
+
+async function toggleProvider(name, enabled) {
+    try {
+        const resp = await fetch(`/api/providers/${name}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled }),
+        });
+        const data = await resp.json();
+        showToast(data.message, enabled ? 'success' : 'warning');
+
+        const card = document.getElementById(`provider-${name}`);
+        if (card) {
+            card.classList.toggle('provider-disabled', !enabled);
+        }
+    } catch (e) {
+        showToast('Error al cambiar proveedor', 'danger');
+    }
+}
+</script>
+{% endblock %}

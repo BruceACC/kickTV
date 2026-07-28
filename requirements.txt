@@ -1,0 +1,35 @@
+# ============================================
+# KickTV — Python Dependencies
+# ============================================
+
+# Web Framework
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.12
+
+# Templating & Static
+jinja2==3.1.4
+
+# Async HTTP
+aiohttp==3.10.5
+aiofiles==24.1.0
+
+# Database
+aiosqlite==0.20.0
+
+# Configuration
+python-dotenv==1.0.1
+pydantic-settings==2.5.2
+pydantic==2.9.1
+
+# Scheduling
+apscheduler==3.10.4
+
+# System Monitoring
+psutil==6.0.0
+
+# Video Downloading
+yt-dlp==2024.8.6
+
+# WebSocket support (included with uvicorn[standard])
+websockets==13.0

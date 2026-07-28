@@ -1,0 +1,41 @@
+# ============================================
+# KickTV — .gitignore
+# ============================================
+
+# Environment (contiene stream key y API keys)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Runtime data
+data/videos/
+data/db/
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test files
+test_unlimplay_body.html
