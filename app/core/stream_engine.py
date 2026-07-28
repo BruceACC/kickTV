@@ -116,10 +116,13 @@ class StreamEngine:
         cmd = [
             "ffmpeg", "-hide_banner", "-loglevel", "error",
             "-stream_loop", "-1",  # Loop infinitely
-            "-re",  # Real-time playback
             "-i", self._black_screen_path,
             "-c", "copy",
             "-f", "mpegts",
+            "-mpegts_pmt_start_pid", "0x1000",
+            "-streamid", "0:0x100",
+            "-streamid", "1:0x101",
+            "-max_muxing_queue_size", "9999",
             "pipe:1",
         ]
 
@@ -185,9 +188,12 @@ class StreamEngine:
             "-loglevel", "warning",
             "-stats",
             "-use_wallclock_as_timestamps", "1",
+            "-thread_queue_size", "10240",
+            "-re",
             "-f", "mpegts",
             "-fflags", "+genpts+igndts",
             "-i", "pipe:0",
+            "-max_muxing_queue_size", "9999",
             "-c", "copy"
         ]
 
@@ -251,6 +257,7 @@ class StreamEngine:
         if input_source.startswith(("http://", "https://")):
             cmd.extend([
                 "-headers", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36\r\nReferer: https://unlimplay.com/\r\n",
+                "-rw_timeout", "15000000",
                 "-reconnect", "1",
                 "-reconnect_streamed", "1",
                 "-reconnect_delay_max", "10",
@@ -259,17 +266,16 @@ class StreamEngine:
             ])
 
         cmd.extend([
-            # Read at native speed
-            "-re",
+            "-thread_queue_size", "10240",
             # Input video
             "-i", input_source,
             # Video encoding
             "-c:v", "libx264",
-            "-preset", settings.preset,
+            "-preset", "ultrafast",
             "-tune", "film",
             "-b:v", settings.bitrate,
             "-maxrate", settings.bitrate,
-            "-bufsize", str(int(settings.bitrate.replace("k", "")) * 3) + "k",
+            "-bufsize", str(int(settings.bitrate.replace("k", "")) * 4) + "k",
             "-pix_fmt", "yuv420p",
             "-g", str(settings.fps * 2),
             "-r", str(settings.fps),
@@ -286,6 +292,7 @@ class StreamEngine:
             "-streamid", "1:0x101",
             "-muxdelay", "0",
             "-muxpreload", "0",
+            "-max_muxing_queue_size", "9999",
             "pipe:1"
         ])
 
