@@ -2,9 +2,6 @@
 # KickTV — .gitignore
 # ============================================
 
-# Environment (contiene stream key y API keys)
-.env
-
 # Python
 __pycache__/
 *.py[cod]
