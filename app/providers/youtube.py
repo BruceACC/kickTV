@@ -108,29 +108,48 @@ class YouTubeProvider(BaseProvider):
             self.logger.error("YouTube API Request failed: %s", e)
             return []
 
-    async def _get_direct_url(self, video_url: str) -> Optional[str]:
-        """Get direct download URL using yt-dlp -g."""
+    async def _download_video(self, video_url: str) -> Optional[str]:
+        """Download the video locally using yt-dlp to avoid FFmpeg streaming lag."""
+        cache_dir = settings.abs_video_cache_dir / "yt_cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        file_path = cache_dir / "temp_yt.mp4"
+        
+        # Delete previous temp file if exists
+        if file_path.exists():
+            try:
+                file_path.unlink()
+            except Exception:
+                pass
+                
         try:
             cmd = [
                 "yt-dlp",
-                "-g",
-                "-f", "b",
+                "-f", "b[ext=mp4]/b",
+                "-o", str(file_path),
                 "--no-warnings",
                 "--quiet",
                 video_url,
             ]
+            self.logger.info("Downloading YouTube video locally to prevent lag...")
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=20)
-            if stdout:
-                url = stdout.decode("utf-8").strip().split("\n")[0]
-                return url if url.startswith("http") else None
+            # Give it up to 3 minutes to download
+            await asyncio.wait_for(proc.wait(), timeout=180)
+            
+            if file_path.exists():
+                return str(file_path).replace("\\", "/")
+            return None
+        except asyncio.TimeoutError:
+            self.logger.error("yt-dlp download timed out")
+            if 'proc' in locals():
+                try: proc.kill()
+                except: pass
             return None
         except Exception as e:
-            self.logger.error("yt-dlp URL extraction failed: %s", e)
+            self.logger.error("yt-dlp download failed: %s", e)
             return None
 
     async def search(
@@ -176,9 +195,9 @@ class YouTubeProvider(BaseProvider):
         return await self.random()
 
     async def validate_video(self, video: VideoResult) -> bool:
-        """Fetch the direct stream URL right before playback."""
-        direct_url = await self._get_direct_url(video.url)
-        if direct_url:
-            video.url = direct_url
+        """Download the video right before playback to avoid streaming lag."""
+        local_path = await self._download_video(video.url)
+        if local_path:
+            video.url = local_path
             return True
         return False
