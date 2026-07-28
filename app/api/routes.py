@@ -172,6 +172,14 @@ async def get_history(
     }
 
 
+@router.delete("/history")
+async def clear_history() -> dict:
+    """Clear all play history."""
+    await db.execute("DELETE FROM play_history")
+    await db.commit()
+    return {"success": True, "message": "History cleared successfully"}
+
+
 # ── Providers ───────────────────────────────────────────────
 
 

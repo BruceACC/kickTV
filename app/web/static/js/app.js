@@ -336,6 +336,28 @@ function setEl(id, val) {
 
 // ── Recent Activity ──────────────────────────────
 
+async function clearHistory() {
+    if (!confirm('¿Estás seguro de que quieres limpiar todo el historial?')) {
+        return;
+    }
+    
+    try {
+        const resp = await fetch('/api/history', { method: 'DELETE' });
+        const data = await resp.json();
+        
+        if (data.success) {
+            showToast('Historial limpiado correctamente', 'success');
+            setEl('stat-history', 0);
+            loadActivity();
+        } else {
+            showToast('Error al limpiar historial', 'danger');
+        }
+    } catch (e) {
+        showToast('Error al comunicar con el servidor', 'danger');
+        console.error(e);
+    }
+}
+
 async function loadActivity() {
     try {
         const resp = await fetch('/api/history?limit=10');

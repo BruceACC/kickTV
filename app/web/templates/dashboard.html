@@ -142,7 +142,12 @@
     <!-- Quick Stats -->
     <div class="card glass-card card-quick-stats">
         <div class="card-body">
-            <h2 class="card-title"><i class="bi bi-bar-chart-fill"></i> Estadísticas</h2>
+            <div class="card-header-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 class="card-title" style="margin-bottom: 0;"><i class="bi bi-bar-chart-fill"></i> Estadísticas</h2>
+                <button class="btn btn-sm btn-outline-danger" onclick="clearHistory()" title="Limpiar Historial">
+                    <i class="bi bi-trash"></i> Limpiar Historial
+                </button>
+            </div>
             <div class="quick-stats">
                 <div class="stat-row">
                     <span class="stat-label">Errores Totales</span>
