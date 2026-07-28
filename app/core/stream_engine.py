@@ -116,6 +116,7 @@ class StreamEngine:
         cmd = [
             "ffmpeg", "-hide_banner", "-loglevel", "error",
             "-stream_loop", "-1",  # Loop infinitely
+            "-re",  # Real-time playback MUST be here for wallclock to work
             "-i", self._black_screen_path,
             "-c", "copy",
             "-f", "mpegts",
@@ -189,7 +190,6 @@ class StreamEngine:
             "-stats",
             "-use_wallclock_as_timestamps", "1",
             "-thread_queue_size", "10240",
-            "-re",
             "-f", "mpegts",
             "-fflags", "+genpts+igndts",
             "-i", "pipe:0",
@@ -266,6 +266,7 @@ class StreamEngine:
             ])
 
         cmd.extend([
+            "-re", # MUST pace the output so Master's wallclock gives perfect timestamps
             "-thread_queue_size", "10240",
             # Input video
             "-i", input_source,
