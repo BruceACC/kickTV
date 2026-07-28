@@ -74,8 +74,10 @@ class Settings(BaseSettings):
     log_dir: str = "logs"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
-    # ── Auto-Start ──────────────────────────────────────────
+    # ── Auto-Start & Preview ────────────────────────────────
     auto_start: bool = False  # Start streaming automatically on server boot
+    local_preview: bool = False # Generate local HLS preview for dashboard
+    hls_dir: str = "data/hls"
 
     # ── Computed Properties ─────────────────────────────────
     @property
@@ -125,6 +127,12 @@ class Settings(BaseSettings):
         p = Path(self.log_dir)
         return p if p.is_absolute() else BASE_DIR / p
 
+    @property
+    def abs_hls_dir(self) -> Path:
+        """Absolute path to HLS directory."""
+        p = Path(self.hls_dir)
+        return p if p.is_absolute() else BASE_DIR / p
+
     @field_validator("resolution")
     @classmethod
     def validate_resolution(cls, v: str) -> str:
@@ -145,6 +153,7 @@ class Settings(BaseSettings):
         self.abs_video_cache_dir.mkdir(parents=True, exist_ok=True)
         self.abs_database_path.parent.mkdir(parents=True, exist_ok=True)
         self.abs_log_dir.mkdir(parents=True, exist_ok=True)
+        self.abs_hls_dir.mkdir(parents=True, exist_ok=True)
         # Log subdirectories
         (self.abs_log_dir / "app").mkdir(exist_ok=True)
         (self.abs_log_dir / "ffmpeg").mkdir(exist_ok=True)

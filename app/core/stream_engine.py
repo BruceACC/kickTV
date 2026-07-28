@@ -17,6 +17,7 @@ import logging
 import re
 import signal
 import time
+import shutil
 from datetime import datetime
 from typing import Optional
 
@@ -84,10 +85,20 @@ class StreamEngine:
             "-f", "mpegts",
             "-fflags", "+genpts",
             "-i", "pipe:0",
-            "-c", "copy",
-            "-f", output_format,
-            settings.stream_full_url
+            "-c", "copy"
         ]
+
+        if settings.local_preview:
+            # Clear old HLS segments
+            if settings.abs_hls_dir.exists():
+                shutil.rmtree(settings.abs_hls_dir, ignore_errors=True)
+            settings.abs_hls_dir.mkdir(parents=True, exist_ok=True)
+            
+            hls_path = str(settings.abs_hls_dir / "stream.m3u8").replace("\\", "/")
+            tee_mapping = f"[f={output_format}]{settings.stream_full_url}|[f=hls:hls_time=4:hls_list_size=3:hls_flags=delete_segments]{hls_path}"
+            cmd.extend(["-map", "0", "-f", "tee", tee_mapping])
+        else:
+            cmd.extend(["-f", output_format, settings.stream_full_url])
 
         ffmpeg_logger.info("Starting Master FFmpeg: %s", " ".join(cmd))
         try:

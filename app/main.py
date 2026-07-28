@@ -118,6 +118,10 @@ def create_app() -> FastAPI:
     static_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+    # Mount HLS directory for local preview
+    settings.abs_hls_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/hls", StaticFiles(directory=str(settings.abs_hls_dir)), name="hls")
+
     # Include routers
     app.include_router(api_router)
     app.include_router(ws_router)

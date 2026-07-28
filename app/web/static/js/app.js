@@ -16,6 +16,8 @@ const chartData = {
     fps: [],
 };
 const MAX_CHART_POINTS = 60;
+let hls = null;
+let playerInitTimeout = null;
 
 // ── Utility Functions ────────────────────────────
 
@@ -240,6 +242,14 @@ function updateDashboard(data) {
         label.textContent = stateLabels[data.state] || data.state;
     }
 
+    // Player logic
+    const state = data.state || 'stopped';
+    if (state === 'live' || state === 'starting' || state === 'reconnecting') {
+        initPlayer();
+    } else {
+        stopPlayer();
+    }
+
     // Metrics
     const setEl = (id, val) => {
         const el = document.getElementById(id);
@@ -364,6 +374,107 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// ── Local Preview Player ─────────────────────────
+
+function initPlayer() {
+    const video = document.getElementById('preview-video');
+    const container = document.getElementById('preview-container');
+    const overlay = document.getElementById('preview-overlay');
+    const msg = document.getElementById('preview-msg');
+    
+    if (!video || !container) return;
+    
+    // Only init if not already playing or trying to load
+    if (hls || (video.src && video.src.includes('m3u8'))) return;
+    
+    container.style.display = 'block';
+    overlay.style.display = 'flex';
+    msg.textContent = 'Cargando stream local...';
+
+    const sourceUrl = '/hls/stream.m3u8';
+
+    if (Hls.isSupported()) {
+        hls = new Hls({
+            maxBufferLength: 10,
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 5,
+            levelLoadingTimeOut: 10000,
+        });
+        
+        hls.loadSource(sourceUrl);
+        hls.attachMedia(video);
+        
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+            video.play().catch(e => console.log('Autoplay blocked', e));
+        });
+        
+        hls.on(Hls.Events.FRAG_BUFFERED, function() {
+            if (overlay.style.display !== 'none') {
+                overlay.style.display = 'none';
+            }
+        });
+
+        hls.on(Hls.Events.ERROR, function(event, data) {
+            if (data.fatal) {
+                switch (data.type) {
+                    case Hls.ErrorTypes.NETWORK_ERROR:
+                        console.log('Network error, retrying...');
+                        msg.textContent = 'Buscando señal...';
+                        overlay.style.display = 'flex';
+                        hls.startLoad();
+                        break;
+                    case Hls.ErrorTypes.MEDIA_ERROR:
+                        console.log('Media error, recovering...');
+                        hls.recoverMediaError();
+                        break;
+                    default:
+                        console.log('Unrecoverable error, destroying player');
+                        stopPlayer();
+                        // Try to restart in a few seconds
+                        clearTimeout(playerInitTimeout);
+                        playerInitTimeout = setTimeout(initPlayer, 5000);
+                        break;
+                }
+            }
+        });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Safari fallback
+        video.src = sourceUrl;
+        video.addEventListener('loadedmetadata', function() {
+            video.play();
+        });
+        video.addEventListener('playing', function() {
+            overlay.style.display = 'none';
+        });
+        video.addEventListener('error', function() {
+            stopPlayer();
+            clearTimeout(playerInitTimeout);
+            playerInitTimeout = setTimeout(initPlayer, 5000);
+        });
+    }
+}
+
+function stopPlayer() {
+    const container = document.getElementById('preview-container');
+    const video = document.getElementById('preview-video');
+    
+    if (hls) {
+        hls.destroy();
+        hls = null;
+    }
+    
+    if (video) {
+        video.removeAttribute('src');
+        video.load();
+    }
+    
+    if (container) {
+        container.style.display = 'none';
+    }
+    
+    clearTimeout(playerInitTimeout);
+}
 
 // ── Dashboard Init ───────────────────────────────
 
