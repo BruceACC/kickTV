@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     log_dir: str = "logs"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
+    # ── Auto-Start ──────────────────────────────────────────
+    auto_start: bool = False  # Start streaming automatically on server boot
+
     # ── Computed Properties ─────────────────────────────────
     @property
     def resolution_width(self) -> int:

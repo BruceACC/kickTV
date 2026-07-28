@@ -77,6 +77,13 @@ async def lifespan(app: FastAPI):
     logger.info("API docs:  http://%s:%d/docs", settings.dashboard_host, settings.dashboard_port)
     logger.info("=" * 50)
 
+    # Auto-start stream if configured
+    if settings.auto_start:
+        from app.core.stream_engine import engine
+        logger.info("AUTO_START enabled — starting stream automatically...")
+        await engine.start()
+        logger.info("[OK] Stream auto-started")
+
     yield
 
     # ── Shutdown ───────────────────────────────────
