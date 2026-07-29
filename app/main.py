@@ -21,7 +21,6 @@ from app.core.scheduler import setup_scheduler, scheduler
 from app.database import db
 from app.logger import get_logger, setup_logging
 
-from app.providers.unlimplay import UnlimplayProvider
 from app.providers.youtube import YouTubeProvider
 from app.providers.tiktok import TikTokProvider
 from app.providers.instagram import InstagramProvider
@@ -37,11 +36,6 @@ def _register_providers() -> None:
     youtube = YouTubeProvider()
     youtube.enabled = settings.provider_youtube_enabled
     queue.register_provider(youtube)
-
-    # Unlimplay
-    unlimplay = UnlimplayProvider()
-    unlimplay.enabled = settings.provider_unlimplay_enabled
-    queue.register_provider(unlimplay)
 
     # TikTok
     tiktok = TikTokProvider()

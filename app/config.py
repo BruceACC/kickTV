@@ -58,12 +58,7 @@ class Settings(BaseSettings):
     provider_pixabay_enabled: bool = True
     provider_archive_enabled: bool = True
     provider_youtube_enabled: bool = False
-    provider_reddit_enabled: bool = True
-    provider_unlimplay_enabled: bool = False
-
-    # ── Provider Weights ────────────────────────────────────
-    provider_youtube_weight: int = 20
-    provider_unlimplay_weight: int = 80
+    provider_youtube_weight: int = 60
     provider_tiktok_enabled: bool = False
     provider_tiktok_weight: int = 25
     provider_instagram_enabled: bool = False

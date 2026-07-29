@@ -172,8 +172,6 @@ class SmartQueue:
         for p in candidates:
             if p.name == ProviderName.YOUTUBE:
                 cand_weights.append(settings.provider_youtube_weight)
-            elif p.name == ProviderName.UNLIMPLAY:
-                cand_weights.append(settings.provider_unlimplay_weight)
             elif p.name == ProviderName.TIKTOK:
                 cand_weights.append(settings.provider_tiktok_weight)
             elif p.name == ProviderName.INSTAGRAM:
