@@ -124,7 +124,8 @@ class YouTubeProvider(BaseProvider):
         try:
             cmd = [
                 "yt-dlp",
-                "-f", "b[ext=mp4]/b",
+                "-f", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/b[height<=720][ext=mp4]/b",
+                "--merge-output-format", "mp4",
                 "-o", str(file_path),
                 "--no-warnings",
                 "--quiet",

@@ -265,24 +265,22 @@ class StreamEngine:
                 "-reconnect_on_http_error", "4xx,5xx",
             ])
 
+        # -re BEFORE -i = input-side pacing (demuxer level, VFR-safe)
         cmd.extend([
+            "-re",
             "-thread_queue_size", "10240",
-            # Input video
             "-i", input_source,
-            # Video encoding
+            # Video encoding — no -r flag, let fps filter handle framerate
             "-c:v", "libx264",
             "-preset", "ultrafast",
-            "-tune", "film",
             "-b:v", settings.bitrate,
             "-maxrate", settings.bitrate,
             "-bufsize", str(int(settings.bitrate.replace("k", "")) * 4) + "k",
             "-pix_fmt", "yuv420p",
             "-g", str(settings.fps * 2),
-            "-r", str(settings.fps),
-            "-vf", f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black,fps={settings.fps},realtime",
+            "-vf", f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black,fps={settings.fps}",
             # Audio encoding
             "-c:a", "aac",
-            "-af", "arealtime",
             "-b:a", settings.audio_bitrate,
             "-ac", "2",
             "-ar", "44100",
