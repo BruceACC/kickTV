@@ -23,6 +23,8 @@ from app.logger import get_logger, setup_logging
 
 from app.providers.unlimplay import UnlimplayProvider
 from app.providers.youtube import YouTubeProvider
+from app.providers.tiktok import TikTokProvider
+from app.providers.instagram import InstagramProvider
 from app.web.views import web_router
 
 
@@ -31,7 +33,7 @@ logger = get_logger("kicktv")
 
 def _register_providers() -> None:
     """Register all content providers based on configuration."""
-    # YouTube (CC) — disabled by default
+    # YouTube (CC)
     youtube = YouTubeProvider()
     youtube.enabled = settings.provider_youtube_enabled
     queue.register_provider(youtube)
@@ -40,6 +42,16 @@ def _register_providers() -> None:
     unlimplay = UnlimplayProvider()
     unlimplay.enabled = settings.provider_unlimplay_enabled
     queue.register_provider(unlimplay)
+
+    # TikTok
+    tiktok = TikTokProvider()
+    tiktok.enabled = settings.provider_tiktok_enabled
+    queue.register_provider(tiktok)
+
+    # Instagram Reels
+    instagram = InstagramProvider()
+    instagram.enabled = settings.provider_instagram_enabled
+    queue.register_provider(instagram)
 
     providers = queue.get_providers()
     enabled = sum(1 for p in providers.values() if p.enabled)

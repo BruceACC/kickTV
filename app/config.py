@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     # ── Provider Weights ────────────────────────────────────
     provider_youtube_weight: int = 20
     provider_unlimplay_weight: int = 80
+    provider_tiktok_enabled: bool = False
+    provider_tiktok_weight: int = 25
+    provider_instagram_enabled: bool = False
+    provider_instagram_weight: int = 15
+    instagram_cookies_file: str = ""  # Path to cookies.txt for yt-dlp
 
     # ── Queue ───────────────────────────────────────────────
     queue_min_size: int = 5

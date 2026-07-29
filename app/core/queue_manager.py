@@ -174,6 +174,10 @@ class SmartQueue:
                 cand_weights.append(settings.provider_youtube_weight)
             elif p.name == ProviderName.UNLIMPLAY:
                 cand_weights.append(settings.provider_unlimplay_weight)
+            elif p.name == ProviderName.TIKTOK:
+                cand_weights.append(settings.provider_tiktok_weight)
+            elif p.name == ProviderName.INSTAGRAM:
+                cand_weights.append(settings.provider_instagram_weight)
             else:
                 cand_weights.append(50)  # Default weight for others
                 

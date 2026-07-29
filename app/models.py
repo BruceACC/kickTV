@@ -31,6 +31,10 @@ class VideoCategory(str, Enum):
     SHORTS = "shorts"
     TRAILERS = "trailers"
     CIENCIA = "ciencia"
+    HUMOR = "humor"
+    ASOMBRO = "asombro"
+    SUSPENSO = "suspenso"
+    MUSICA = "música"
 
 
 class ProviderName(str, Enum):
@@ -42,6 +46,8 @@ class ProviderName(str, Enum):
     YOUTUBE = "youtube"
     REDDIT = "reddit"
     UNLIMPLAY = "unlimplay"
+    TIKTOK = "tiktok"
+    INSTAGRAM = "instagram"
 
 
 class StreamState(str, Enum):

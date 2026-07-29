@@ -31,6 +31,10 @@ CATEGORY_KEYWORDS: dict[VideoCategory, list[str]] = {
     VideoCategory.SHORTS: ["short film", "clip", "short video", "micro film"],
     VideoCategory.TRAILERS: ["trailer", "movie trailer", "game trailer", "teaser", "preview"],
     VideoCategory.CIENCIA: ["science", "physics", "chemistry", "biology", "experiment", "lab"],
+    VideoCategory.HUMOR: ["humor", "comedy", "funny", "laugh", "jokes", "stand up"],
+    VideoCategory.ASOMBRO: ["amazing", "wow", "incredible", "satisfying", "mindblowing", "unbelievable"],
+    VideoCategory.SUSPENSO: ["suspense", "thriller", "mystery", "tension", "plot twist", "creepy"],
+    VideoCategory.MUSICA: ["music", "song", "concert", "dance", "remix", "DJ", "cover"],
 }
 
 
