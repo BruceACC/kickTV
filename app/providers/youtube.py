@@ -60,56 +60,57 @@ class YouTubeProvider(BaseProvider):
         self._cache: dict[VideoCategory, list[VideoResult]] = {cat: [] for cat in VideoCategory}
 
     async def _api_search(self, query: str, category: VideoCategory, limit: int = 15) -> list[VideoResult]:
-        """Run search using yt-dlp to avoid Google API quota limits."""
-        cmd = [
-            "yt-dlp",
-            "--dump-json",
-            "--flat-playlist",
-            "--no-warnings",
-            "--quiet",
-            f"ytsearch{limit}:{query}",
-        ]
+        """Search using the official YouTube Data API v3 and rotate keys to balance quota."""
+        api_keys = settings.youtube_keys
+        if not api_keys:
+            self.logger.error("No YouTube API keys configured in .env")
+            return []
+            
+        # Elegir una clave aleatoria para balancear la carga (quota)
+        api_key = random.choice(api_keys)
+        
+        self.logger.info("YouTube API Search: '%s' (Using key %s...)", query, api_key[:10])
+        
+        url = "https://www.googleapis.com/youtube/v3/search"
+        params = {
+            "part": "snippet",
+            "q": query,
+            "maxResults": limit,
+            "type": "video",
+            "key": api_key,
+        }
         
         try:
-            self.logger.info("Using yt-dlp to search YouTube for: %s", query)
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await proc.communicate()
-            if proc.returncode != 0:
-                self.logger.error("yt-dlp search failed: %s", stderr.decode().strip())
-                return []
-                
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params) as resp:
+                    if resp.status != 200:
+                        err_text = await resp.text()
+                        self.logger.error("YouTube API HTTP %d: %s", resp.status, err_text)
+                        return []
+                    data = await resp.json()
+                    
             results: list[VideoResult] = []
-            for line in stdout.decode().strip().split("\n"):
-                if not line:
+            for item in data.get("items", []):
+                snippet = item.get("snippet", {})
+                video_id = item.get("id", {}).get("videoId")
+                if not video_id:
                     continue
-                import json
-                try:
-                    data = json.loads(line)
-                    video_id = data.get("id")
-                    if not video_id:
-                        continue
-                        
-                    res = VideoResult(
-                        url=f"https://www.youtube.com/watch?v={video_id}",
-                        title=data.get("title", "YouTube Video"),
-                        duration=data.get("duration") or 0,
-                        author=data.get("channel", "YouTube"),
-                        category=category,
-                        provider=ProviderName.YOUTUBE,
-                        thumbnail="",
-                        video_id=generate_video_id("youtube", video_id),
-                        license="unknown"
-                    )
-                    results.append(res)
-                except Exception:
-                    pass
+                    
+                res = VideoResult(
+                    url=f"https://www.youtube.com/watch?v={video_id}",
+                    title=snippet.get("title", "YouTube Video"),
+                    duration=0,  # yt-dlp obtendrá la duración real al descargar
+                    author=snippet.get("channelTitle", "YouTube"),
+                    category=category,
+                    provider=ProviderName.YOUTUBE,
+                    thumbnail=snippet.get("thumbnails", {}).get("high", {}).get("url", ""),
+                    video_id=generate_video_id("youtube", video_id),
+                    license="unknown"
+                )
+                results.append(res)
             return results
         except Exception as e:
-            self.logger.error("yt-dlp search exception: %s", e)
+            self.logger.error("YouTube API exception: %s", e)
             return []
 
     async def _download_video(self, video_url: str, video_id: str) -> Optional[str]:
