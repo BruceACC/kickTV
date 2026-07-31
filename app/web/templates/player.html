@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KickTV Player</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* ensures whole video is visible, like TV */
+            background-color: #000;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 10;
+            pointer-events: none;
+            transition: opacity 0.5s;
+            max-width: 400px;
+            display: none; /* Hide by default, show on hover or load */
+        }
+
+        #overlay h1 {
+            margin: 0 0 5px 0;
+            font-size: 18px;
+            color: #53ff45; /* Kick Green */
+        }
+        
+        #overlay p {
+            margin: 0;
+            opacity: 0.8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #status {
+            position: absolute;
+            color: white;
+            font-size: 24px;
+            z-index: 5;
+        }
+        
+        /* Two video elements to allow seamless double-buffering */
+        #player1, #player2 {
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .active {
+            opacity: 1 !important;
+            z-index: 2;
+        }
+        
+        .hidden {
+            opacity: 0 !important;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status">Loading KickTV...</div>
+
+    <div id="unmute-btn" style="position: absolute; bottom: 20px; right: 20px; z-index: 100; display: none; background: rgba(0,0,0,0.7); color: white; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-family: sans-serif; align-items: center; gap: 8px;">
+        <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;">
+            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+        </svg>
+        <span>Haz click para escuchar</span>
+    </div>
+
+    <div id="overlay">
+        <h1 id="tv-title">Loading...</h1>
+        <p id="tv-author">Please wait</p>
+    </div>
+
+    <!-- Double buffering for seamless transitions -->
+    <video id="player1" class="active" playsinline></video>
+    <video id="player2" class="hidden" playsinline></video>
+    
+    <!-- Iframe player for Unlimplay -->
+    <iframe id="player_iframe" class="hidden" frameborder="0" allowfullscreen allow="autoplay; fullscreen"></iframe>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const overlay = document.getElementById('overlay');
+        const titleEl = document.getElementById('tv-title');
+        const authorEl = document.getElementById('tv-author');
+        
+        let currentPlayer = 1;
+        let isFirstLoad = true;
+        let nextVideoData = null;
+
+        const p1 = document.getElementById('player1');
+        const p2 = document.getElementById('player2');
+        const pIframe = document.getElementById('player_iframe');
+        
+        let iframeTimeout = null;
+
+        // Fetch the next video metadata and preload it into the inactive player
+        async function preloadNext() {
+            try {
+                console.log("Fetching next video...");
+                const res = await fetch("/api/player/next");
+                if (!res.ok) throw new Error("API returned " + res.status);
+                
+                nextVideoData = await res.json();
+                console.log("Preloading:", nextVideoData.title);
+                
+                // Only preload if it's an MP4 file
+                if (!nextVideoData.is_iframe) {
+                    const inactive = currentPlayer === 1 ? p2 : p1;
+                    inactive.src = nextVideoData.url;
+                    inactive.load();
+                }
+                
+            } catch (err) {
+                console.error("Error fetching next video:", err);
+                // Retry in 3 seconds if queue is empty or error
+                setTimeout(preloadNext, 3000);
+            }
+        }
+
+        // Switch to the preloaded video and start playing
+        async function playNext() {
+            if (!nextVideoData) {
+                console.log("Next video not ready, buffering...");
+                statusEl.style.display = 'block';
+                statusEl.innerText = "Buffering...";
+                
+                // Wait until nextVideoData is populated
+                while (!nextVideoData) {
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            }
+            
+            statusEl.style.display = 'none';
+
+            // Clear any previous iframe timeout
+            if (iframeTimeout) {
+                clearTimeout(iframeTimeout);
+                iframeTimeout = null;
+            }
+
+            if (nextVideoData.is_iframe) {
+                // Pause both video players
+                p1.className = 'hidden';
+                p2.className = 'hidden';
+                p1.pause();
+                p2.pause();
+
+                // Setup and show iframe
+                pIframe.src = nextVideoData.url;
+                pIframe.className = 'active';
+
+                // Setup timer to auto-skip when duration ends
+                const durMs = nextVideoData.duration * 1000 || 7200000; // fallback to 2h
+                console.log("Iframe will run for", durMs, "ms");
+                iframeTimeout = setTimeout(() => {
+                    console.log("Iframe finished by timeout, skipping to next...");
+                    playNext();
+                }, durMs);
+
+                // Update UI
+                titleEl.innerText = nextVideoData.title;
+                authorEl.innerText = `${nextVideoData.category.toUpperCase()} • ${nextVideoData.author}`;
+                overlay.style.display = 'block';
+                overlay.style.opacity = '1';
+                setTimeout(() => { overlay.style.opacity = '0'; }, 8000);
+
+                nextVideoData = null;
+                preloadNext();
+
+            } else {
+                // It's a standard MP4 video
+                pIframe.className = 'hidden';
+                pIframe.src = ''; // stop playback
+
+                const active = currentPlayer === 1 ? p1 : p2;
+                const inactive = currentPlayer === 1 ? p2 : p1;
+
+                // Swap roles
+                active.className = 'hidden';
+                active.pause();
+                
+                inactive.className = 'active';
+                try {
+                    await inactive.play();
+                    
+                    // Update UI
+                    titleEl.innerText = nextVideoData.title;
+                    authorEl.innerText = `${nextVideoData.category.toUpperCase()} • ${nextVideoData.author}`;
+                    
+                    // Show overlay briefly
+                    overlay.style.display = 'block';
+                    overlay.style.opacity = '1';
+                    setTimeout(() => { overlay.style.opacity = '0'; }, 8000);
+
+                    // Update state
+                    currentPlayer = currentPlayer === 1 ? 2 : 1;
+                    nextVideoData = null; // Clear so we can load the next one
+                    
+                    // Immediately start preloading the NEXT one while this one plays
+                    preloadNext();
+                    
+                } catch (e) {
+                    console.warn("Autoplay prevented by browser. Trying muted autoplay...", e);
+                    inactive.muted = true;
+                    try {
+                        await inactive.play();
+                        
+                        // Update UI
+                        titleEl.innerText = nextVideoData.title;
+                        authorEl.innerText = `${nextVideoData.category.toUpperCase()} • ${nextVideoData.author}`;
+                        
+                        // Show overlay briefly
+                        overlay.style.display = 'block';
+                        overlay.style.opacity = '1';
+                        setTimeout(() => { overlay.style.opacity = '0'; }, 8000);
+
+                        // Update state
+                        currentPlayer = currentPlayer === 1 ? 2 : 1;
+                        nextVideoData = null;
+                        preloadNext();
+                        
+                        // Show unmute button since it's playing muted
+                        statusEl.style.display = 'block';
+                        statusEl.innerText = "🔇 Clic para activar sonido";
+                        statusEl.style.background = "#eab308"; // yellow warning
+                        
+                        document.body.onclick = () => {
+                            document.body.onclick = null;
+                            p1.muted = false;
+                            p2.muted = false;
+                            statusEl.style.display = 'none';
+                        };
+
+                    } catch (e2) {
+                        console.error("Even muted autoplay failed:", e2);
+                        statusEl.style.display = 'block';
+                        statusEl.innerText = "Clic para iniciar KickTV";
+                        document.body.onclick = () => {
+                            document.body.onclick = null;
+                            playNext();
+                        };
+                    }
+                }
+            }
+        }
+
+        // When current video ends, play the next one
+        p1.onended = playNext;
+        p2.onended = playNext;
+
+        // Auto-retry on video error (e.g. corrupted file)
+        p1.onerror = () => { console.error("Video 1 error"); playNext(); };
+        p2.onerror = () => { console.error("Video 2 error"); playNext(); };
+
+        // Initial Boot
+        let isMuted = false;
+
+
+        window.onload = async () => {
+            statusEl.innerText = "Starting...";
+            await preloadNext();
+            
+            if (isFirstLoad) {
+                isFirstLoad = false;
+                playNext();
+            }
+        };
+    </script>
+</body>
+</html>

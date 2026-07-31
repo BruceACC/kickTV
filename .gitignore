@@ -37,3 +37,8 @@ desktop.ini
 
 # Test files
 test_unlimplay_body.html
+
+# Secrets
+.env
+instagram/
+tiktok/

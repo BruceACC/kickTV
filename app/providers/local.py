@@ -61,8 +61,9 @@ class LocalProvider(BaseProvider):
 
         return VideoResult(
             url=str(path),
+            file_path=str(path),
             title=path.stem.replace("_", " ").replace("-", " ").title(),
-            duration=0,  # Could use ffprobe, but kept simple
+            duration=0,
             author="Local",
             category=category,
             provider=ProviderName.LOCAL,

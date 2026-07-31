@@ -13,7 +13,7 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from app.core.stream_engine import engine
+
 from app.core.system_monitor import monitor
 from app.core.queue_manager import queue
 from app.logger import log_broadcaster
@@ -128,48 +128,44 @@ async def websocket_status(websocket: WebSocket) -> None:
     try:
         while True:
             try:
-                stream = engine.status
                 system = monitor.get_stats()
 
+                # Determine current and next video from queue
+                # For Web TV, the queue is the source of truth
                 current_video = None
-                if stream.current_video:
+                
+                # We can't know exactly what OBS is playing, but we can peek at the queue
+                peek_item = queue.peek()
+                
+                if peek_item:
                     current_video = {
-                        "title": stream.current_video.title,
-                        "author": stream.current_video.author,
-                        "category": stream.current_video.category.value,
-                        "provider": stream.current_video.provider.value,
-                        "duration": stream.current_video.duration,
-                        "thumbnail": stream.current_video.thumbnail,
-                    }
-
-                next_video = None
-                if stream.next_video:
-                    next_video = {
-                        "title": stream.next_video.title,
-                        "author": stream.next_video.author,
-                        "category": stream.next_video.category.value,
-                        "provider": stream.next_video.provider.value,
+                        "title": peek_item.title,
+                        "author": peek_item.author,
+                        "category": peek_item.category.value,
+                        "provider": peek_item.provider.value,
+                        "duration": peek_item.duration,
+                        "thumbnail": peek_item.thumbnail,
                     }
 
                 payload = {
                     "type": "status",
                     "data": {
-                        "state": stream.state.value,
+                        "state": "live",
                         "current_video": current_video,
-                        "next_video": next_video,
-                        "fps": stream.current_fps,
-                        "bitrate": stream.current_bitrate,
-                        "frames_dropped": stream.frames_dropped,
-                        "total_videos_played": stream.total_videos_played,
-                        "reconnect_count": stream.reconnect_count,
-                        "uptime": format_uptime(stream.started_at),
+                        "next_video": None,
+                        "fps": 30,
+                        "bitrate": 0,
+                        "frames_dropped": 0,
+                        "total_videos_played": 0,
+                        "reconnect_count": 0,
+                        "uptime": "OBS Controlled",
                         "queue_size": queue.size,
                         "cpu_percent": system.cpu_percent,
                         "ram_percent": system.ram_percent,
                         "ram_used_mb": system.ram_used_mb,
                         "disk_percent": system.disk_percent,
-                        "ffmpeg_cpu": system.ffmpeg_cpu,
-                        "ffmpeg_ram_mb": system.ffmpeg_ram_mb,
+                        "ffmpeg_cpu": 0,
+                        "ffmpeg_ram_mb": 0,
                     },
                 }
 

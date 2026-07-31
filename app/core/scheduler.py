@@ -17,7 +17,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.core.queue_manager import queue
-from app.core.stream_engine import engine
+
 from app.core.system_monitor import monitor
 from app.database import db
 from app.utils.video import clean_video_cache
@@ -42,13 +42,12 @@ async def job_record_stats() -> None:
     """Record system stats snapshot to DB."""
     try:
         stats = monitor.get_stats()
-        stream_status = engine.status
         await db.record_stats({
             "cpu_percent": stats.cpu_percent,
             "ram_percent": stats.ram_percent,
-            "fps": stream_status.current_fps,
-            "bitrate": stream_status.current_bitrate,
-            "frames_dropped": stream_status.frames_dropped,
+            "fps": 30,
+            "bitrate": 0,
+            "frames_dropped": 0,
             "queue_size": queue.size,
         })
     except Exception as e:
@@ -65,15 +64,7 @@ async def job_clean_cache() -> None:
         logger.error("Scheduler: cache cleanup failed: %s", e)
 
 
-async def job_health_check() -> None:
-    """Check stream health and attempt recovery if needed."""
-    try:
-        status = engine.status
-        if engine.is_running and status.state.value == "error":
-            logger.warning("Health check: stream in error state, restarting...")
-            await engine.restart()
-    except Exception as e:
-        logger.error("Scheduler: health check failed: %s", e)
+
 
 
 async def job_remove_invalid() -> None:
@@ -115,14 +106,7 @@ def setup_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    # Health check — every minute
-    scheduler.add_job(
-        job_health_check,
-        trigger=IntervalTrigger(minutes=1),
-        id="health_check",
-        name="Health Check",
-        replace_existing=True,
-    )
+
 
     # Remove invalid videos — every 30 minutes
     scheduler.add_job(

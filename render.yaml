@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: kicktv
+    env: docker
+    plan: free
+    region: ohio
+    healthCheckPath: /api/status
+    envVars:
+      - key: STREAM_URL
+        sync: false
+      - key: STREAM_KEY
+        sync: false
+      - key: DASHBOARD_PORT
+        value: "8000"

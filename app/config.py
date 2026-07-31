@@ -29,19 +29,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ── Stream ──────────────────────────────────────────────
-    stream_url: str = "rtmps://fa723fc1b171.global-contribute.live-video.net/app"
-    stream_key: str = "your_stream_key_here"
 
-    # ── Video Encoding ──────────────────────────────────────
-    bitrate: str = "4500k"
-    fps: int = 30
-    resolution: str = "1920x1080"
-    preset: Literal[
-        "ultrafast", "superfast", "veryfast", "faster",
-        "fast", "medium", "slow", "slower", "veryslow"
-    ] = "veryfast"
-    audio_bitrate: str = "160k"
 
     # ── Dashboard ───────────────────────────────────────────
     dashboard_host: str = "0.0.0.0"
@@ -49,6 +37,7 @@ class Settings(BaseSettings):
 
     # ── Provider API Keys ───────────────────────────────────
     pexels_api_key: str = ""
+    tmdb_api_key: str = ""
     pixabay_api_key: str = ""
     youtube_api_key: str = ""
 
@@ -59,15 +48,21 @@ class Settings(BaseSettings):
     provider_archive_enabled: bool = True
     provider_youtube_enabled: bool = False
     provider_youtube_weight: int = 60
-    provider_tiktok_enabled: bool = False
-    provider_tiktok_weight: int = 25
-    provider_instagram_enabled: bool = False
+    provider_tiktok_enabled: bool = True
+    provider_tiktok_weight: int = 15
+    tiktok_cookies_file: str = "tiktok/cookies.txt"
+
+    provider_instagram_enabled: bool = True
     provider_instagram_weight: int = 15
-    instagram_cookies_file: str = ""  # Path to cookies.txt for yt-dlp
+
+    provider_reddit_enabled: bool = True
+    provider_reddit_weight: int = 40
+
+    instagram_cookies_file: str = "instagram/cookies.txt"  # Path to cookies.txt for yt-dlp
 
     # ── Queue ───────────────────────────────────────────────
     queue_min_size: int = 5
-    queue_max_history: int = 500
+    queue_max_history: int = 10
     video_cache_dir: str = "data/videos"
     max_video_duration: int = 14400  # seconds (4 hours)
     min_video_duration: int = 5  # seconds
@@ -84,36 +79,7 @@ class Settings(BaseSettings):
     local_preview: bool = False # Generate local HLS preview for dashboard
     hls_dir: str = "data/hls"
 
-    # ── Computed Properties ─────────────────────────────────
-    @property
-    def resolution_width(self) -> int:
-        """Extract width from resolution string (e.g., '1920x1080' -> 1920)."""
-        return int(self.resolution.split("x")[0])
-
-    @property
-    def resolution_height(self) -> int:
-        """Extract height from resolution string (e.g., '1920x1080' -> 1080)."""
-        return int(self.resolution.split("x")[1])
-
-    @property
-    def stream_full_url(self) -> str:
-        """Build full stream URL, handling RTMPS app paths and SRT query params."""
-        url = self.stream_url.strip()
-        key = self.stream_key.strip()
-        
-        if not key:
-            return url
-            
-        if url.startswith("srt://"):
-            return f"{url}&streamid={key}" if "?" in url else f"{url}?streamid={key}"
-            
-        url = url.rstrip("/")
-        # If standard Kick RTMPS server is missing /app/, append it
-        if url.endswith(".live-video.net") and "global-contribute" in url:
-            url += "/app"
-            
-        return f"{url}/{key}"
-
+    # (Removed obsolete stream_url and resolution properties)
     @property
     def abs_video_cache_dir(self) -> Path:
         """Absolute path to video cache directory."""
@@ -138,21 +104,7 @@ class Settings(BaseSettings):
         p = Path(self.hls_dir)
         return p if p.is_absolute() else BASE_DIR / p
 
-    @field_validator("resolution")
-    @classmethod
-    def validate_resolution(cls, v: str) -> str:
-        """Ensure resolution is in WxH format."""
-        parts = v.split("x")
-        if len(parts) != 2:
-            raise ValueError("Resolution must be in WIDTHxHEIGHT format (e.g., 1920x1080)")
-        try:
-            w, h = int(parts[0]), int(parts[1])
-        except ValueError:
-            raise ValueError("Resolution dimensions must be integers")
-        if w <= 0 or h <= 0:
-            raise ValueError("Resolution dimensions must be positive")
-        return v
-
+    # Validation removed
     def ensure_directories(self) -> None:
         """Create all required directories."""
         self.abs_video_cache_dir.mkdir(parents=True, exist_ok=True)

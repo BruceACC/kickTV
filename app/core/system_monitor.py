@@ -11,7 +11,7 @@ from typing import Optional
 
 import psutil
 
-from app.core.stream_engine import engine
+
 from app.models import SystemStats
 
 logger = logging.getLogger("kicktv")
@@ -43,19 +43,7 @@ class SystemMonitor:
         except Exception as e:
             logger.error("Error collecting system stats: %s", e)
 
-        # FFmpeg process stats
-        ffmpeg_pid = engine.status.ffmpeg_pid
-        if ffmpeg_pid:
-            try:
-                proc = psutil.Process(ffmpeg_pid)
-                stats.ffmpeg_pid = ffmpeg_pid
-                stats.ffmpeg_cpu = proc.cpu_percent(interval=0.1)
-                mem_info = proc.memory_info()
-                stats.ffmpeg_ram_mb = round(mem_info.rss / (1024 * 1024), 1)
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
-            except Exception as e:
-                logger.debug("Could not get FFmpeg process stats: %s", e)
+
 
         return stats
 

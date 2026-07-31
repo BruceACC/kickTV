@@ -59,67 +59,69 @@ class YouTubeProvider(BaseProvider):
         # Cache per category to save API quota
         self._cache: dict[VideoCategory, list[VideoResult]] = {cat: [] for cat in VideoCategory}
 
-    async def _api_search(self, query: str, category: VideoCategory, limit: int = 50) -> list[VideoResult]:
-        """Run search using official YouTube API."""
-        if not self._api_key:
-            self.logger.error("YouTube API Key missing")
-            return []
-            
-        url = "https://www.googleapis.com/youtube/v3/search"
-        params = {
-            "part": "snippet",
-            "q": query,
-            "type": "video",
-            "videoLicense": "creativeCommon",
-            "maxResults": str(limit),
-            "key": self._api_key,
-        }
+    async def _api_search(self, query: str, category: VideoCategory, limit: int = 15) -> list[VideoResult]:
+        """Run search using yt-dlp to avoid Google API quota limits."""
+        cmd = [
+            "yt-dlp",
+            "--dump-json",
+            "--flat-playlist",
+            "--no-warnings",
+            "--quiet",
+            f"ytsearch{limit}:{query}",
+        ]
         
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params) as resp:
-                    if resp.status != 200:
-                        text = await resp.text()
-                        self.logger.error("YouTube API Error %d: %s", resp.status, text)
-                        return []
-                    data = await resp.json()
-                    
+            self.logger.info("Using yt-dlp to search YouTube for: %s", query)
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                self.logger.error("yt-dlp search failed: %s", stderr.decode().strip())
+                return []
+                
             results: list[VideoResult] = []
-            for item in data.get("items", []):
-                snippet = item.get("snippet", {})
-                video_id = item.get("id", {}).get("videoId")
-                if not video_id:
+            for line in stdout.decode().strip().split("\n"):
+                if not line:
                     continue
-                    
-                res = VideoResult(
-                    url=f"https://www.youtube.com/watch?v={video_id}",
-                    title=snippet.get("title", "YouTube Video"),
-                    duration=0,  # Data API search doesn't return duration.
-                    author=snippet.get("channelTitle", "YouTube"),
-                    category=category,
-                    provider=ProviderName.YOUTUBE,
-                    thumbnail=snippet.get("thumbnails", {}).get("high", {}).get("url", ""),
-                    video_id=generate_video_id("youtube", video_id),
-                    license="Creative Commons"
-                )
-                results.append(res)
+                import json
+                try:
+                    data = json.loads(line)
+                    video_id = data.get("id")
+                    if not video_id:
+                        continue
+                        
+                    res = VideoResult(
+                        url=f"https://www.youtube.com/watch?v={video_id}",
+                        title=data.get("title", "YouTube Video"),
+                        duration=data.get("duration") or 0,
+                        author=data.get("channel", "YouTube"),
+                        category=category,
+                        provider=ProviderName.YOUTUBE,
+                        thumbnail="",
+                        video_id=generate_video_id("youtube", video_id),
+                        license="unknown"
+                    )
+                    results.append(res)
+                except Exception:
+                    pass
             return results
         except Exception as e:
-            self.logger.error("YouTube API Request failed: %s", e)
+            self.logger.error("yt-dlp search exception: %s", e)
             return []
 
-    async def _download_video(self, video_url: str) -> Optional[str]:
+    async def _download_video(self, video_url: str, video_id: str) -> Optional[str]:
         """Download the video locally using yt-dlp to avoid FFmpeg streaming lag."""
-        cache_dir = settings.abs_video_cache_dir / "yt_cache"
+        # Use a flat directory so the frontend can serve it easily via /videos/
+        cache_dir = settings.abs_video_cache_dir
         cache_dir.mkdir(parents=True, exist_ok=True)
-        file_path = cache_dir / "temp_yt.mp4"
+        file_path = cache_dir / f"{video_id}.mp4"
         
-        # Delete previous temp file if exists
+        # If it already exists, return immediately (already downloaded)
         if file_path.exists():
-            try:
-                file_path.unlink()
-            except Exception:
-                pass
+            return str(file_path).replace("\\", "/")
                 
         try:
             cmd = [
@@ -196,9 +198,9 @@ class YouTubeProvider(BaseProvider):
         return await self.random()
 
     async def validate_video(self, video: VideoResult) -> bool:
-        """Download the video right before playback to avoid streaming lag."""
-        local_path = await self._download_video(video.url)
+        """Download the video to the local cache."""
+        local_path = await self._download_video(video.url, video.video_id)
         if local_path:
-            video.url = local_path
+            video.file_path = local_path
             return True
         return False

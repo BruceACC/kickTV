@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KickTV Queen - Peticiones Automáticas</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at top right, #1e1b4b, #0f172a);
+            color: #f8fafc;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            margin-top: 20px;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin: 0;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+        }
+
+        .search-container {
+            width: 100%;
+            max-width: 600px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 20px 25px;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 50px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            outline: none;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .search-input:focus {
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(56, 189, 248, 0.3);
+            border: 1px solid rgba(56, 189, 248, 0.5);
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+            margin-top: 40px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .card img {
+            width: 100%;
+            aspect-ratio: 2/3;
+            object-fit: cover;
+            display: block;
+        }
+
+        .card-info {
+            padding: 12px;
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 1rem;
+            margin: 0 0 5px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-type {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            font-weight: 800;
+        }
+
+        /* Modal Styles */
+        #tv-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        .modal-content h2 { margin-top: 0; color: #38bdf8; }
+        
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .form-row div { flex: 1; }
+        
+        .modal-content label {
+            display: block;
+            margin-bottom: 8px;
+            color: #cbd5e1;
+            font-size: 0.9rem;
+        }
+
+        .modal-content input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: white;
+            font-size: 1.1rem;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .btn-inject {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #0ea5e9, #3b82f6);
+            color: white;
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn-inject:hover { opacity: 0.9; }
+
+        /* Queue Viewer */
+        .queue-container {
+            width: 100%;
+            max-width: 600px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-sizing: border-box;
+        }
+
+        .queue-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+
+        .queue-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: #e2e8f0;
+        }
+
+        .queue-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        /* Custom scrollbar */
+        .queue-list::-webkit-scrollbar { width: 6px; }
+        .queue-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
+        .queue-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+        .queue-item {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            border-radius: 8px;
+        }
+        
+        .queue-item.is-movie {
+            background: rgba(56, 189, 248, 0.15);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        .queue-item-index {
+            font-weight: 800;
+            color: #94a3b8;
+            margin-right: 15px;
+            min-width: 20px;
+        }
+
+        .queue-item-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .queue-item-badge {
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            border-radius: 20px;
+            background: #334155;
+            color: #cbd5e1;
+            margin-left: 10px;
+            text-transform: uppercase;
+            font-weight: 800;
+        }
+
+        .queue-item.is-movie .queue-item-badge {
+            background: #0ea5e9;
+            color: white;
+        }
+
+        .queue-item-provider {
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #94a3b8;
+            margin-left: 5px;
+            text-transform: capitalize;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .provider-youtube { color: #f87171; border-color: rgba(248, 113, 113, 0.3); }
+        .provider-tiktok { color: #2dd4bf; border-color: rgba(45, 212, 191, 0.3); }
+        .provider-instagram { color: #c084fc; border-color: rgba(192, 132, 252, 0.3); }
+        .provider-local { color: #facc15; border-color: rgba(250, 204, 21, 0.3); }
+
+        #toast {
+            position: fixed;
+            bottom: -100px;
+            background: #10b981;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: bottom 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            z-index: 200;
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .loader {
+            display: none;
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #38bdf8;
+            animation: spin 1s ease-in-out infinite;
+            position: absolute;
+            right: 20px;
+            top: 18px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>KickTV Queen</h1>
+        <p style="color: #94a3b8; font-size: 1.1rem;">Buscador automático de Películas y Series</p>
+    </div>
+
+    <div class="queue-container">
+        <div class="queue-header">
+            <h2>Cola de Reproducción</h2>
+            <span id="queue-count" style="color: #94a3b8; font-size: 0.9rem;">Cargando...</span>
+        </div>
+        <div class="queue-list" id="queue-list">
+            <!-- Queue items inject here -->
+        </div>
+    </div>
+
+    <div class="search-container">
+        <input type="text" id="search-input" class="search-input" placeholder="Ej: Avengers Endgame, Breaking Bad..." autocomplete="off">
+        <div class="loader" id="loader"></div>
+    </div>
+
+    <div class="results-grid" id="results">
+        <!-- Results inject here -->
+    </div>
+
+    <!-- TV Show Modal -->
+    <div id="tv-modal">
+        <div class="modal-content">
+            <h2 id="modal-title">Serie Seleccionada</h2>
+            <p style="color: #94a3b8; margin-top: -10px; margin-bottom: 20px;">Indica el episodio a reproducir</p>
+            
+            <div class="form-row">
+                <div>
+                    <label>Temporada</label>
+                    <input type="number" id="tv-season" value="1" min="1">
+                </div>
+                <div>
+                    <label>Episodio</label>
+                    <input type="number" id="tv-episode" value="1" min="1">
+                </div>
+            </div>
+            
+            <button class="btn-inject" onclick="injectTvShow()">Inyectar Serie</button>
+            <button style="background: transparent; border: none; color: #94a3b8; margin-top: 15px; cursor: pointer;" onclick="closeModal()">Cancelar</button>
+        </div>
+    </div>
+
+    <div id="toast">✅ Inyectado correctamente en KickTV</div>
+
+    <script>
+        const input = document.getElementById('search-input');
+        const resultsDiv = document.getElementById('results');
+        const loader = document.getElementById('loader');
+        const queueList = document.getElementById('queue-list');
+        const queueCount = document.getElementById('queue-count');
+        let timeout = null;
+        let selectedTvShow = null;
+
+        // Auto-refresh queue every 5 seconds
+        function fetchQueue() {
+            fetch('/api/queue')
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) renderQueue(data.queue, data.size);
+                })
+                .catch(err => console.error("Error fetching queue:", err));
+        }
+
+        function renderQueue(queue, size) {
+            queueCount.innerText = `${size} videos`;
+            queueList.innerHTML = '';
+            
+            if (queue.length === 0) {
+                queueList.innerHTML = `<p style="color: #64748b; font-size: 0.9rem; text-align: center;">La cola está vacía.</p>`;
+                return;
+            }
+
+            queue.forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = `queue-item ${item.is_iframe ? 'is-movie' : ''}`;
+                
+                const badgeText = item.is_iframe ? 'Cine' : item.category;
+                const providerText = item.is_iframe ? 'Premium' : item.provider;
+                
+                el.innerHTML = `
+                    <div class="queue-item-index">${index + 1}</div>
+                    <div class="queue-item-title" title="${item.title}">${item.title}</div>
+                    <div class="queue-item-provider provider-${item.provider}">${providerText}</div>
+                    <div class="queue-item-badge">${badgeText}</div>
+                `;
+                queueList.appendChild(el);
+            });
+        }
+
+        // Initial fetch and interval
+        fetchQueue();
+        setInterval(fetchQueue, 5000);
+
+        input.addEventListener('input', (e) => {
+            clearTimeout(timeout);
+            const query = e.target.value.trim();
+            
+            if (query.length < 2) {
+                resultsDiv.innerHTML = '';
+                return;
+            }
+
+            loader.style.display = 'block';
+            timeout = setTimeout(() => {
+                fetch(`/api/tmdb/search?query=${encodeURIComponent(query)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        loader.style.display = 'none';
+                        if(data.success) {
+                            renderResults(data.results);
+                        } else {
+                            resultsDiv.innerHTML = `<p style="color: #ef4444; text-align: center; width: 100%;">Error en TMDB (Falta API Key?)</p>`;
+                        }
+                    })
+                    .catch(err => {
+                        loader.style.display = 'none';
+                        console.error(err);
+                    });
+            }, 500); // 500ms debounce
+        });
+
+        function renderResults(results) {
+            resultsDiv.innerHTML = '';
+            if (results.length === 0) {
+                resultsDiv.innerHTML = `<p style="color: #94a3b8; text-align: center; width: 100%;">No se encontraron resultados.</p>`;
+                return;
+            }
+
+            results.forEach(item => {
+                const isTv = item.media_type === 'tv';
+                const title = isTv ? item.name : item.title;
+                const poster = item.poster_path 
+                    ? `https://image.tmdb.org/t/p/w300${item.poster_path}` 
+                    : 'https://via.placeholder.com/300x450/1e293b/475569?text=Sin+Portada';
+                
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.onclick = () => handleSelect(item);
+                
+                card.innerHTML = `
+                    <img src="${poster}" alt="Poster">
+                    <div class="card-info">
+                        <div class="card-type" style="color: ${isTv ? '#c084fc' : '#38bdf8'}">${isTv ? '📺 Serie' : '🎬 Película'}</div>
+                        <h3 class="card-title">${title}</h3>
+                        <div style="color: #64748b; font-size: 0.8rem;">${(item.release_date || item.first_air_date || '').split('-')[0]}</div>
+                    </div>
+                `;
+                resultsDiv.appendChild(card);
+            });
+        }
+
+        function handleSelect(item) {
+            const isTv = item.media_type === 'tv';
+            if (isTv) {
+                selectedTvShow = item;
+                document.getElementById('modal-title').innerText = item.name;
+                document.getElementById('tv-modal').style.display = 'flex';
+            } else {
+                // It's a movie, inject directly
+                injectRequest({
+                    tmdb_id: String(item.id),
+                    is_tv: false,
+                    title: item.title
+                });
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('tv-modal').style.display = 'none';
+            selectedTvShow = null;
+        }
+
+        function injectTvShow() {
+            if (!selectedTvShow) return;
+            const s = parseInt(document.getElementById('tv-season').value);
+            const e = parseInt(document.getElementById('tv-episode').value);
+            
+            injectRequest({
+                tmdb_id: String(selectedTvShow.id),
+                is_tv: true,
+                title: `${selectedTvShow.name} (T${s}E${e})`,
+                season: s,
+                episode: e
+            });
+            
+            closeModal();
+        }
+
+        function injectRequest(payload) {
+            fetch('/api/queue/inject', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(`✅ ${payload.title} fue enviada a la transmisión.`);
+                    input.value = '';
+                    resultsDiv.innerHTML = '';
+                    fetchQueue(); // refresh queue immediately
+                } else {
+                    alert("Error: " + JSON.stringify(data));
+                }
+            })
+            .catch(err => alert("Error de red inyectando: " + err));
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.bottom = '40px';
+            setTimeout(() => { toast.style.bottom = '-100px'; }, 4000);
+        }
+    </script>
+</body>
+</html>

@@ -46,6 +46,18 @@ def _register_providers() -> None:
     instagram = InstagramProvider()
     instagram.enabled = settings.provider_instagram_enabled
     queue.register_provider(instagram)
+    
+    # Reddit Memes
+    from app.providers.reddit import RedditProvider
+    reddit = RedditProvider()
+    reddit.enabled = settings.provider_reddit_enabled
+    queue.register_provider(reddit)
+    
+    # Local Provider (Fallback)
+    from app.providers.local import LocalProvider
+    local = LocalProvider()
+    local.enabled = True
+    queue.register_provider(local)
 
     providers = queue.get_providers()
     enabled = sum(1 for p in providers.values() if p.enabled)
@@ -85,20 +97,18 @@ async def lifespan(app: FastAPI):
 
     # Auto-start stream if configured
     if settings.auto_start:
-        from app.core.stream_engine import engine
-        logger.info("AUTO_START enabled — starting stream automatically...")
-        await engine.start()
-        logger.info("[OK] Stream auto-started")
+        # We are using the new Web TV Architecture (OBS).
+        # We no longer auto-start the FFmpeg engine directly to Kick.
+        logger.info("==================================================")
+        logger.info(" WEB TV PLAYER READY!")
+        logger.info(" Open this URL in OBS Studio (Browser Source):")
+        logger.info(" http://%s:%d/tv", settings.dashboard_host, settings.dashboard_port)
+        logger.info("==================================================")
 
     yield
 
     # ── Shutdown ───────────────────────────────────
     logger.info("Shutting down KickTV...")
-
-    # Stop stream engine
-    from app.core.stream_engine import engine
-    if engine.is_running:
-        await engine.stop()
 
     # Stop scheduler
     if scheduler.running:
@@ -124,9 +134,9 @@ def create_app() -> FastAPI:
     static_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-    # Mount HLS directory for local preview
-    settings.abs_hls_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/hls", StaticFiles(directory=str(settings.abs_hls_dir)), name="hls")
+    # Mount videos directory for web player
+    settings.abs_video_cache_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/videos", StaticFiles(directory=str(settings.abs_video_cache_dir)), name="videos")
 
     # Include routers
     app.include_router(api_router)

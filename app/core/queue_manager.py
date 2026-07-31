@@ -48,6 +48,8 @@ class SmartQueue:
         self._providers: dict[ProviderName, BaseProvider] = {}
         self._lock = asyncio.Lock()
         self._filling = False
+        self._file_to_delete: Optional[str] = None
+        self._download_task: Optional[asyncio.Task] = None
 
     def register_provider(self, provider: BaseProvider) -> None:
         """Register a content provider."""
@@ -79,6 +81,11 @@ class SmartQueue:
             logger.info(
                 "Queue initialized: %d played IDs loaded", len(self._played_ids)
             )
+            
+            # Start background download worker
+            if not self._download_task:
+                self._download_task = asyncio.create_task(self._download_worker())
+                
         except Exception as e:
             logger.error("Queue initialization failed: %s", e)
 
@@ -136,8 +143,8 @@ class SmartQueue:
             logger.warning(f"Rejecting {video.video_id}: already played")
             return False
 
-        # Rule 2: No same author consecutively
-        if video.author and video.author == self._last_author:
+        # Rule 2: No same author consecutively (unless it's Local fallback)
+        if video.author and video.author == self._last_author and video.provider != ProviderName.LOCAL:
             logger.warning(f"Rejecting {video.video_id}: same author ({video.author})")
             return False
 
@@ -190,9 +197,14 @@ class SmartQueue:
 
         for provider in ordered_providers:
             try:
-                video = await provider.random(category=category)
+                # Add a timeout so a broken provider doesn't freeze everything
+                video = await asyncio.wait_for(
+                    provider.random(category=category), timeout=45.0
+                )
                 if video and self._is_acceptable(video):
                     return video
+            except asyncio.TimeoutError:
+                logger.error("Provider '%s' timed out", provider.name.value)
             except Exception as e:
                 logger.error(
                     "Provider '%s' failed: %s", provider.name.value, e
@@ -221,81 +233,135 @@ class SmartQueue:
         if self._filling:
             return 0
 
-        async with self._lock:
-            self._filling = True
+        self._filling = True
+        try:
+            target = target_size or settings.queue_min_size
+            added = 0
+            max_attempts = target * 4  # Avoid infinite loops
+            attempts = 0
+
+            # Load enabled categories
             try:
-                target = target_size or settings.queue_min_size
-                added = 0
-                max_attempts = target * 4  # Avoid infinite loops
-                attempts = 0
+                enabled_categories = await db.get_enabled_categories()
+            except Exception:
+                enabled_categories = []
 
-                # Load enabled categories
-                try:
-                    enabled_categories = await db.get_enabled_categories()
-                except Exception:
-                    enabled_categories = []
+            while self.size < target and attempts < max_attempts:
+                attempts += 1
 
-                while self.size < target and attempts < max_attempts:
-                    attempts += 1
+                # Pick target category
+                category = self._get_target_category(enabled_categories)
 
-                    # Pick target category
-                    category = self._get_target_category(enabled_categories)
+                # Fetch a video (WITHOUT HOLDING THE LOCK)
+                video = await self._fetch_video(category)
+                if not video:
+                    # Try with any category as fallback
+                    video = await self._fetch_video(
+                        random.choice(list(VideoCategory))
+                    )
 
-                    # Fetch a video
-                    video = await self._fetch_video(category)
-                    if not video:
-                        # Try with any category as fallback
-                        video = await self._fetch_video(
-                            random.choice(list(VideoCategory))
-                        )
-
-                    if video:
+                if video:
+                    # Now acquire lock just to append
+                    async with self._lock:
                         item = QueueItem(
                             position=self.size,
                             video=video,
                         )
                         self._queue.append(item)
-                        added += 1
-                        logger.info(
-                            "Queue + [%s] '%s' by %s (%s)",
-                            video.category.value,
-                            video.title[:40],
-                            video.author[:20],
-                            video.provider.value,
-                        )
-                    else:
-                        # Brief pause before retrying
-                        await asyncio.sleep(1)
+                    
+                    added += 1
+                    logger.info(
+                        "Queue + [%s] '%s' by %s (%s)",
+                        video.category.value,
+                        video.title[:40],
+                        video.author[:20],
+                        video.provider.value,
+                    )
+                else:
+                    # Brief pause before retrying
+                    await asyncio.sleep(1)
 
-                if added:
-                    logger.info("Queue filled: +%d items (total: %d)", added, self.size)
-                return added
-            finally:
-                self._filling = False
+            if added:
+                logger.info("Queue filled: +%d items (total: %d)", added, self.size)
+            return added
+        finally:
+            self._filling = False
+
+    async def _download_worker(self) -> None:
+        """Background task that pre-downloads videos in the queue."""
+        while True:
+            try:
+                # Ensure queue has at least 10 items
+                if self.size < 10:
+                    await self.fill(10)
+                
+                # Check for undownloaded videos
+                # Copy items to avoid modifying while iterating
+                for item in self.items:
+                        if item.video.is_iframe or item.video.file_path:
+                            continue  # No need to download iframes or already downloaded files
+                            
+                        provider = self._providers.get(item.video.provider)
+                        if provider:
+                            logger.info("Pre-fetching video '%s'...", item.video.title[:30])
+                            # This will block until downloaded
+                            valid = await provider.validate_video(item.video)
+                            if not valid:
+                                # Remove from queue if it failed to download
+                                try:
+                                    self._queue.remove(item)
+                                except ValueError:
+                                    pass
+                
+                await asyncio.sleep(5)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("Download worker error: %s", e)
+                await asyncio.sleep(10)
 
     async def next(self) -> Optional[VideoResult]:
         """
         Pop the next video from the queue.
         Updates history tracking state.
         """
-        # Ensure queue has content
-        if self.size == 0:
-            await self.fill()
+        # Cleanup previous file
+        if getattr(self, "_file_to_delete", None):
+            try:
+                import os
+                if os.path.exists(self._file_to_delete):
+                    os.remove(self._file_to_delete)
+                    logger.info("Auto-cleaned video file: %s", self._file_to_delete)
+            except Exception as e:
+                logger.error("Failed to delete %s: %s", self._file_to_delete, e)
+            self._file_to_delete = None
 
         if self.size == 0:
-            logger.warning("Queue is empty after fill attempt")
+            await self.fill(10)
+
+        item = None
+        # Find the first item that is fully downloaded or is an iframe
+        while self.size > 0:
+            for i, q_item in enumerate(self._queue):
+                if q_item.video.file_path or q_item.video.is_iframe:
+                    item = q_item
+                    del self._queue[i]
+                    break
+            
+            if item:
+                break
+                
+            logger.info("Waiting for next video to finish downloading...")
+            await asyncio.sleep(2)
+
+        if not item:
             return None
 
-        item = self._queue.popleft()
         video = item.video
-
-        # Validate and prepare video (e.g., fetch direct stream URL)
-        provider = self._providers.get(video.provider)
-        if provider:
-            valid = await provider.validate_video(video)
-            if not valid:
-                logger.warning(f"Video {video.title} validation failed, skipping.")
-                return await self.next()
+        
+        # Schedule this file for deletion on the NEXT call to next()
+        if not video.is_iframe:
+            self._file_to_delete = video.file_path
 
         # Update tracking state
         self._played_ids.add(video.video_id)
@@ -317,8 +383,11 @@ class SmartQueue:
             logger.error("Failed to record history: %s", e)
 
         # Trigger background fill if queue is getting low
-        if self.size < settings.queue_min_size:
-            asyncio.create_task(self.fill())
+        if self.size < 10:
+            asyncio.create_task(self.fill(10))
+
+        self._last_played_file = item.video.file_path or item.video.url
+        logger.info("Now playing: %s", self._last_played_file)
 
         return video
 
@@ -339,6 +408,33 @@ class SmartQueue:
         """Clear the entire queue."""
         self._queue.clear()
         logger.info("Queue cleared")
+
+    async def inject_movie(self, tmdb_id: str, duration: int, title: str, is_tv: bool = False, season: int = 1, episode: int = 1) -> None:
+        """Inject a requested movie/tv show at the front of the queue using Unlimplay."""
+        async with self._lock:
+            if is_tv:
+                url = f"https://unlimplay.com/f/embed/tv/{tmdb_id}/{season}/{episode}?autoplay=1&autoPlay=1"
+            else:
+                url = f"https://unlimplay.com/f/embed/movie/{tmdb_id}?autoplay=1&autoPlay=1"
+                
+            video = VideoResult(
+                url=url,
+                title=title,
+                duration=duration,
+                author="Unlimplay",
+                category=VideoCategory.PELICULAS,
+                provider=ProviderName.UNLIMPLAY,
+                video_id=f"unlimplay_{tmdb_id}_{season}_{episode}",
+                is_iframe=True
+            )
+            
+            item = QueueItem(
+                position=0,
+                video=video
+            )
+            
+            self._queue.appendleft(item)
+            logger.info("Injected movie %s to the front of the queue", title)
 
     async def remove_invalid(self) -> int:
         """

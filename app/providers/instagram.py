@@ -223,18 +223,15 @@ class InstagramProvider(BaseProvider):
 
     # ── Local download ────────────────────────────────────────
 
-    async def _download_video(self, video_url: str) -> Optional[str]:
+    async def _download_video(self, video_url: str, video_id: str) -> Optional[str]:
         """Download Instagram Reel locally using yt-dlp with cookies."""
-        cache_dir = settings.abs_video_cache_dir / "ig_cache"
+        cache_dir = settings.abs_video_cache_dir
         cache_dir.mkdir(parents=True, exist_ok=True)
-        file_path = cache_dir / "temp_ig.mp4"
+        file_path = cache_dir / f"{video_id}.mp4"
 
-        # Delete previous temp file
+        # If it already exists, return immediately
         if file_path.exists():
-            try:
-                file_path.unlink()
-            except Exception:
-                pass
+            return str(file_path).replace("\\", "/")
 
         cookies_path = self._get_cookies_path()
 
@@ -354,8 +351,8 @@ class InstagramProvider(BaseProvider):
 
     async def validate_video(self, video: VideoResult) -> bool:
         """Download Reel locally before playback."""
-        local_path = await self._download_video(video.url)
+        local_path = await self._download_video(video.url, video.video_id)
         if local_path:
-            video.url = local_path
+            video.file_path = local_path
             return True
         return False

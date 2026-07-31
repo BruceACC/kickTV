@@ -35,6 +35,7 @@ class VideoCategory(str, Enum):
     ASOMBRO = "asombro"
     SUSPENSO = "suspenso"
     MUSICA = "música"
+    PELICULAS = "películas"
 
 
 class ProviderName(str, Enum):
@@ -81,6 +82,8 @@ class VideoResult(BaseModel):
     description: str = ""
     license: str = ""
     video_id: str = ""                                 # unique provider id
+    file_path: str = ""                                # local file path
+    is_iframe: bool = False                            # if true, url is an iframe embed
 
     @property
     def duration_class(self) -> VideoDuration:
@@ -115,7 +118,6 @@ class StreamStatus(BaseModel):
     current_bitrate: str = "0k"
     frames_dropped: int = 0
     reconnect_count: int = 0
-    ffmpeg_pid: Optional[int] = None
     started_at: Optional[datetime] = None
 
 
@@ -128,9 +130,6 @@ class SystemStats(BaseModel):
     disk_percent: float = 0.0
     disk_used_gb: float = 0.0
     disk_total_gb: float = 0.0
-    ffmpeg_pid: Optional[int] = None
-    ffmpeg_cpu: float = 0.0
-    ffmpeg_ram_mb: float = 0.0
 
 
 # ── Provider Models ─────────────────────────────────────────────

@@ -125,11 +125,39 @@ class TikTokProvider(BaseProvider):
     def __init__(self) -> None:
         super().__init__()
         self._enabled = settings.provider_tiktok_enabled
+        self._cookies_file = settings.tiktok_cookies_file
         # Cache per category to avoid repeated yt-dlp calls
         self._cache: dict[VideoCategory, list[VideoResult]] = {
             cat: [] for cat in VideoCategory
         }
         self._discovery_lock = asyncio.Lock()
+        
+        if self._enabled and not self._has_valid_cookies():
+            self.logger.warning(
+                "TikTok provider disabled: no cookies file configured. "
+                "TikTok now requires authentication for yt-dlp."
+            )
+            self._enabled = False
+
+    def _has_valid_cookies(self) -> bool:
+        """Check if a valid cookies file is configured and exists."""
+        from pathlib import Path
+        from app.config import BASE_DIR
+        if not self._cookies_file:
+            return False
+        cookies_path = Path(self._cookies_file)
+        if not cookies_path.is_absolute():
+            cookies_path = BASE_DIR / cookies_path
+        return cookies_path.exists()
+
+    def _get_cookies_path(self) -> str:
+        """Get absolute path to cookies file."""
+        from pathlib import Path
+        from app.config import BASE_DIR
+        cookies_path = Path(self._cookies_file)
+        if not cookies_path.is_absolute():
+            cookies_path = BASE_DIR / cookies_path
+        return str(cookies_path)
 
     # ── oEmbed metadata ───────────────────────────────────────
 
@@ -170,8 +198,10 @@ class TikTokProvider(BaseProvider):
             "--playlist-end", str(limit),
             "--no-warnings",
             "--quiet",
-            source_url,
         ]
+        if self._has_valid_cookies():
+            cmd.extend(["--cookies", self._get_cookies_path()])
+        cmd.append(source_url)
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -213,18 +243,15 @@ class TikTokProvider(BaseProvider):
 
     # ── Local download ────────────────────────────────────────
 
-    async def _download_video(self, video_url: str) -> Optional[str]:
+    async def _download_video(self, video_url: str, video_id: str) -> Optional[str]:
         """Download TikTok video locally using yt-dlp."""
-        cache_dir = settings.abs_video_cache_dir / "tiktok_cache"
+        cache_dir = settings.abs_video_cache_dir
         cache_dir.mkdir(parents=True, exist_ok=True)
-        file_path = cache_dir / "temp_tiktok.mp4"
+        file_path = cache_dir / f"{video_id}.mp4"
 
-        # Delete previous temp file
+        # If it already exists, return immediately
         if file_path.exists():
-            try:
-                file_path.unlink()
-            except Exception:
-                pass
+            return str(file_path).replace("\\", "/")
 
         try:
             cmd = [
@@ -234,8 +261,10 @@ class TikTokProvider(BaseProvider):
                 "-o", str(file_path),
                 "--no-warnings",
                 "--quiet",
-                video_url,
             ]
+            if self._has_valid_cookies():
+                cmd.extend(["--cookies", self._get_cookies_path()])
+            cmd.append(video_url)
             self.logger.info("Downloading TikTok video locally...")
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -350,8 +379,8 @@ class TikTokProvider(BaseProvider):
 
     async def validate_video(self, video: VideoResult) -> bool:
         """Download video locally before playback to avoid streaming lag."""
-        local_path = await self._download_video(video.url)
+        local_path = await self._download_video(video.url, video.video_id)
         if local_path:
-            video.url = local_path
+            video.file_path = local_path
             return True
         return False
