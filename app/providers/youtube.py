@@ -60,19 +60,17 @@ class YouTubeProvider(BaseProvider):
         self._cache: dict[VideoCategory, list[VideoResult]] = {cat: [] for cat in VideoCategory}
 
     async def _api_search(self, query: str, category: VideoCategory, limit: int = 15) -> list[VideoResult]:
-        """Search using the official YouTube Data API v3 and rotate keys to balance quota."""
+        """Search using the official YouTube Data API v3 and get durations to use as iframes."""
         api_keys = settings.youtube_keys
         if not api_keys:
             self.logger.error("No YouTube API keys configured in .env")
             return []
             
-        # Elegir una clave aleatoria para balancear la carga (quota)
         api_key = random.choice(api_keys)
-        
         self.logger.info("YouTube API Search: '%s' (Using key %s...)", query, api_key[:10])
         
-        url = "https://www.googleapis.com/youtube/v3/search"
-        params = {
+        search_url = "https://www.googleapis.com/youtube/v3/search"
+        search_params = {
             "part": "snippet",
             "q": query,
             "maxResults": limit,
@@ -82,30 +80,63 @@ class YouTubeProvider(BaseProvider):
         
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params) as resp:
+                async with session.get(search_url, params=search_params) as resp:
                     if resp.status != 200:
                         err_text = await resp.text()
-                        self.logger.error("YouTube API HTTP %d: %s", resp.status, err_text)
+                        self.logger.error("YouTube API Search HTTP %d: %s", resp.status, err_text)
                         return []
                     data = await resp.json()
                     
+                video_ids = []
+                snippets = {}
+                for item in data.get("items", []):
+                    vid = item.get("id", {}).get("videoId")
+                    if vid:
+                        video_ids.append(vid)
+                        snippets[vid] = item.get("snippet", {})
+
+                if not video_ids:
+                    return []
+
+                # Fetch durations
+                durations = {}
+                videos_url = "https://www.googleapis.com/youtube/v3/videos"
+                videos_params = {
+                    "part": "contentDetails",
+                    "id": ",".join(video_ids),
+                    "key": api_key
+                }
+                async with session.get(videos_url, params=videos_params) as resp_v:
+                    if resp_v.status == 200:
+                        v_data = await resp_v.json()
+                        import re
+                        for v_item in v_data.get("items", []):
+                            duration_iso = v_item.get("contentDetails", {}).get("duration", "PT0S")
+                            match = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', duration_iso)
+                            if match:
+                                h, m, s = match.groups()
+                                duration_sec = int(h or 0) * 3600 + int(m or 0) * 60 + int(s or 0)
+                                durations[v_item["id"]] = duration_sec
+                            else:
+                                durations[v_item["id"]] = 60
+
             results: list[VideoResult] = []
-            for item in data.get("items", []):
-                snippet = item.get("snippet", {})
-                video_id = item.get("id", {}).get("videoId")
-                if not video_id:
-                    continue
-                    
+            for vid in video_ids:
+                snippet = snippets[vid]
+                dur = durations.get(vid, 60)
+                
+                # Usar iframe embebido en lugar de descargar
                 res = VideoResult(
-                    url=f"https://www.youtube.com/watch?v={video_id}",
+                    url=f"https://www.youtube.com/embed/{vid}?autoplay=1&controls=0",
                     title=snippet.get("title", "YouTube Video"),
-                    duration=0,  # yt-dlp obtendrá la duración real al descargar
+                    duration=dur,
                     author=snippet.get("channelTitle", "YouTube"),
                     category=category,
                     provider=ProviderName.YOUTUBE,
                     thumbnail=snippet.get("thumbnails", {}).get("high", {}).get("url", ""),
-                    video_id=generate_video_id("youtube", video_id),
-                    license="unknown"
+                    video_id=generate_video_id("youtube", vid),
+                    license="unknown",
+                    is_iframe=True
                 )
                 results.append(res)
             return results
@@ -199,9 +230,6 @@ class YouTubeProvider(BaseProvider):
         return await self.random()
 
     async def validate_video(self, video: VideoResult) -> bool:
-        """Download the video to the local cache."""
-        local_path = await self._download_video(video.url, video.video_id)
-        if local_path:
-            video.file_path = local_path
-            return True
-        return False
+        """YouTube videos are now served as iframes directly from the Web Player. No download needed."""
+        # Al marcarlo como iframe, el frontend de OBS lo reproduce nativamente
+        return True
