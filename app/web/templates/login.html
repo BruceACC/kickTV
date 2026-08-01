@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cine VIP - Acceso</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #53ff45; /* Kick Green */
+            --bg-dark: #0f1011; /* Kick Dark */
+            --bg-panel: #1a1c1e;
+            --text: #ffffff;
+            --text-muted: #888;
+        }
+        
+        * {
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-image: radial-gradient(circle at 50% -20%, #2a4023 0%, var(--bg-dark) 50%);
+        }
+
+        .login-card {
+            background-color: var(--bg-panel);
+            padding: 3rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            border: 1px solid rgba(83, 255, 69, 0.1);
+        }
+
+        h1 {
+            font-weight: 800;
+            margin-top: 0;
+            font-size: 28px;
+            letter-spacing: -0.5px;
+        }
+
+        h1 span {
+            color: var(--primary);
+        }
+
+        p {
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(0,0,0,0.3);
+            border: 2px solid #333;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(83, 255, 69, 0.2);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--primary);
+            color: black;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            background-color: #4ee640;
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .error {
+            color: #ff4d4d;
+            font-size: 14px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+        <h1>Cine <span>VIP</span></h1>
+        <p>Ingresa la clave secreta proporcionada en el stream para acceder a las películas sin anuncios.</p>
+        
+        <form id="login-form">
+            <div class="input-group">
+                <input type="password" id="password" placeholder="Escribe la clave VIP" required autocomplete="off">
+            </div>
+            <button type="submit" id="submit-btn">Desbloquear Acceso</button>
+            <div id="error-msg" class="error">Contraseña incorrecta. ¡Pregunta en el chat del stream!</div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('submit-btn');
+            const errorMsg = document.getElementById('error-msg');
+            
+            btn.classList.add('loading');
+            btn.innerText = 'Verificando...';
+            errorMsg.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                if (res.ok) {
+                    // Set cookie that expires in 1 day
+                    const d = new Date();
+                    d.setTime(d.getTime() + (24*60*60*1000));
+                    document.cookie = `vip_code=${password};expires=${d.toUTCString()};path=/`;
+                    
+                    // Reload the page, backend will now serve the private player
+                    window.location.reload();
+                } else {
+                    errorMsg.style.display = 'block';
+                    btn.classList.remove('loading');
+                    btn.innerText = 'Desbloquear Acceso';
+                    
+                    // Shake animation
+                    const card = document.querySelector('.login-card');
+                    card.style.transform = 'translateX(5px)';
+                    setTimeout(() => card.style.transform = 'translateX(-5px)', 100);
+                    setTimeout(() => card.style.transform = 'translateX(5px)', 200);
+                    setTimeout(() => card.style.transform = 'translateX(0)', 300);
+                }
+            } catch (err) {
+                errorMsg.innerText = 'Error de conexión. Intenta de nuevo.';
+                errorMsg.style.display = 'block';
+                btn.classList.remove('loading');
+                btn.innerText = 'Desbloquear Acceso';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -315,6 +315,7 @@
     <div class="header">
         <h1>KickTV Queen</h1>
         <p style="color: #94a3b8; font-size: 1.1rem;">Buscador automático de Películas y Series</p>
+        <a href="/vip" style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: linear-gradient(135deg, #10b981, #53ff45); color: black; font-weight: bold; border-radius: 20px; text-decoration: none; box-shadow: 0 4px 15px rgba(83,255,69,0.3);">👑 Acceso VIP</a>
     </div>
 
     <div class="queue-container">
@@ -451,8 +452,35 @@
                     ? `https://image.tmdb.org/t/p/w300${item.poster_path}` 
                     : 'https://via.placeholder.com/300x450/1e293b/475569?text=Sin+Portada';
                 
+                const dateStr = item.release_date || item.first_air_date || '';
+                let statusLabel = '';
+                let borderStyle = 'border: 2px solid #10b981;'; // Default green for released
+                item.isFuture = false;
+                
+                if (dateStr) {
+                    const releaseDate = new Date(dateStr);
+                    const now = new Date();
+                    const diffTime = now - releaseDate;
+                    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+                    
+                    if (releaseDate.getFullYear() > now.getFullYear()) {
+                        statusLabel = '<span style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 5px;">En desarrollo</span>';
+                        borderStyle = 'border: 2px solid #ef4444;';
+                        item.isFuture = true;
+                    } else if (releaseDate > now) {
+                        statusLabel = '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 5px;">Próximo estreno</span>';
+                        borderStyle = 'border: 2px solid #f59e0b;';
+                        item.isFuture = true;
+                    } else if (diffDays >= 0 && diffDays <= 45) {
+                        statusLabel = '<span style="background: #a855f7; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 5px;">Proceso-ANUNCIO</span>';
+                        borderStyle = 'border: 2px solid #a855f7;';
+                        item.isFuture = true;
+                    }
+                }
+                
                 const card = document.createElement('div');
                 card.className = 'card';
+                card.style.cssText = borderStyle;
                 card.onclick = () => handleSelect(item);
                 
                 card.innerHTML = `
@@ -460,7 +488,7 @@
                     <div class="card-info">
                         <div class="card-type" style="color: ${isTv ? '#c084fc' : '#38bdf8'}">${isTv ? '📺 Serie' : '🎬 Película'}</div>
                         <h3 class="card-title">${title}</h3>
-                        <div style="color: #64748b; font-size: 0.8rem;">${(item.release_date || item.first_air_date || '').split('-')[0]}</div>
+                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center;">${dateStr.split('-')[0]}${statusLabel}</div>
                     </div>
                 `;
                 resultsDiv.appendChild(card);
@@ -469,6 +497,13 @@
 
         function handleSelect(item) {
             const isTv = item.media_type === 'tv';
+            const title = isTv ? item.name : item.title;
+            
+            if (item.isFuture) {
+                injectTrailerRequest(title);
+                return;
+            }
+            
             if (isTv) {
                 selectedTvShow = item;
                 document.getElementById('modal-title').innerText = item.name;
@@ -478,7 +513,7 @@
                 injectRequest({
                     tmdb_id: String(item.id),
                     is_tv: false,
-                    title: item.title
+                    title: title
                 });
             }
         }
@@ -522,6 +557,33 @@
                 }
             })
             .catch(err => alert("Error de red inyectando: " + err));
+        }
+
+        function injectTrailerRequest(title) {
+            const loader = document.getElementById('loader');
+            loader.style.display = 'block';
+            
+            fetch('/api/queue/inject_trailer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: title })
+            })
+            .then(res => res.json())
+            .then(data => {
+                loader.style.display = 'none';
+                if(data.success) {
+                    closeModal();
+                    alert("¡Tráiler añadido a la cola con éxito!");
+                    fetchQueue(); // refresh queue
+                } else {
+                    alert(data.detail || "Error al añadir el tráiler");
+                }
+            })
+            .catch(err => {
+                loader.style.display = 'none';
+                console.error(err);
+                alert("Error de red al buscar el tráiler");
+            });
         }
 
         function showToast(msg) {

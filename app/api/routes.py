@@ -51,6 +51,77 @@ async def search_tmdb(query: str = Query(..., min_length=2)):
     results = await tmdb_client.search_multi(query)
     return {"success": True, "results": results}
 
+@router.get("/tmdb/tv/{tmdb_id}")
+async def get_tv_info(tmdb_id: int):
+    """Get detailed TV show info (including seasons and episode counts)."""
+    if not tmdb_client.is_configured():
+        raise HTTPException(status_code=500, detail="TMDB API Key no configurada")
+    details = await tmdb_client.get_tv_details(tmdb_id)
+    return {"success": True, "details": details}
+
+@router.get("/tmdb/now_playing")
+async def get_now_playing():
+    """Get now playing/upcoming movies for the carousel."""
+    if not tmdb_client.is_configured():
+        raise HTTPException(status_code=500, detail="TMDB API Key no configurada")
+    results = await tmdb_client.get_now_playing()
+    return {"success": True, "results": results}
+
+@router.get("/tmdb/top_movies")
+async def get_top_movies():
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    return {"success": True, "results": await tmdb_client.get_top_movies()}
+
+@router.get("/tmdb/top_series")
+async def get_top_series():
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    return {"success": True, "results": await tmdb_client.get_top_series()}
+
+@router.get("/tmdb/top_anime")
+async def get_top_anime():
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    return {"success": True, "results": await tmdb_client.get_top_anime()}
+
+@router.get("/youtube/trailer")
+async def get_youtube_trailer(query: str = Query(..., min_length=2)):
+    """Search YouTube for a trailer and return the video URL."""
+    from app.models import VideoCategory
+    youtube_provider = queue.get_providers().get(ProviderName.YOUTUBE)
+    if not youtube_provider:
+        raise HTTPException(status_code=500, detail="YouTube Provider not registered")
+    
+    # Use the internal _api_search method
+    results = await youtube_provider._api_search(f"{query} trailer", VideoCategory.PELICULAS, limit=1)
+    if not results:
+        raise HTTPException(status_code=404, detail="Trailer not found")
+        
+    return {"success": True, "video": results[0].model_dump()}
+
+class InjectTrailerRequest(BaseModel):
+    title: str
+    
+@router.post("/queue/inject_trailer")
+async def inject_trailer(req: InjectTrailerRequest) -> dict:
+    """Search for a trailer and inject it directly into the queue."""
+    from app.models import VideoCategory, QueueItem
+    youtube_provider = queue.get_providers().get(ProviderName.YOUTUBE)
+    if not youtube_provider:
+        raise HTTPException(status_code=500, detail="YouTube Provider not registered")
+        
+    results = await youtube_provider._api_search(f"{req.title} trailer oficial español", VideoCategory.PELICULAS, limit=1)
+    if not results:
+        raise HTTPException(status_code=404, detail="Trailer no encontrado en YouTube")
+        
+    video = results[0]
+    # Mark it clearly as a trailer in the title
+    video.title = f"[TRÁILER] {video.title}"
+    
+    async with queue._lock:
+        item = QueueItem(position=0, video=video)
+        queue._queue.appendleft(item)
+        
+    return {"success": True, "message": f"Injected trailer for {req.title}"}
+
 @router.post("/queue/inject")
 async def inject_movie(req: InjectRequest) -> dict:
     """Inject a movie/series from Unlimplay into the front of the queue."""
@@ -131,3 +202,20 @@ async def get_next_video() -> dict:
         "category": video.category.value
     }
 
+
+# ── VIP Auth ────────────────────────────────────────────────
+
+class LoginRequest(BaseModel):
+    password: str
+
+@router.post("/auth/login")
+async def login_vip(req: LoginRequest):
+    """Verifica la contraseña VIP y devuelve success si es correcta."""
+    if not settings.vip_password:
+        # If no password is set, anyone can get in (for local testing)
+        return {"success": True}
+        
+    if req.password == settings.vip_password:
+        return {"success": True}
+    
+    raise HTTPException(status_code=401, detail="Contraseña incorrecta")

@@ -62,6 +62,20 @@ class TMDBClient:
         filtered.sort(key=lambda x: x.get("popularity", 0), reverse=True)
         return filtered
 
+    async def get_now_playing(self) -> List[Dict[str, Any]]:
+        """Get movies playing now or upcoming for the carousel."""
+        import datetime
+        current_year = datetime.datetime.now().year
+        data = await self._get("/discover/movie", {
+            "primary_release_year": str(current_year),
+            "sort_by": "popularity.desc",
+            "include_adult": "false"
+        })
+        results = data.get("results", [])
+        for r in results:
+            r["media_type"] = "movie"
+        return results
+
     async def get_movie_details(self, tmdb_id: int) -> Dict[str, Any]:
         """Get movie details including runtime."""
         return await self._get(f"/movie/{tmdb_id}")
@@ -69,5 +83,44 @@ class TMDBClient:
     async def get_tv_details(self, tmdb_id: int) -> Dict[str, Any]:
         """Get TV details (runtime is usually an array of episode runtimes)."""
         return await self._get(f"/tv/{tmdb_id}")
+
+    async def get_top_movies(self) -> List[Dict[str, Any]]:
+        import datetime
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        data = await self._get("/discover/movie", {
+            "sort_by": "popularity.desc",
+            "release_date.lte": today,
+            "vote_count.gte": 100
+        })
+        results = data.get("results", [])[:15]
+        for r in results: r["media_type"] = "movie"
+        return results
+
+    async def get_top_series(self) -> List[Dict[str, Any]]:
+        import datetime
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        data = await self._get("/discover/tv", {
+            "sort_by": "popularity.desc",
+            "first_air_date.lte": today,
+            "without_genres": "16", # 16 is Animation
+            "vote_count.gte": 100
+        })
+        results = data.get("results", [])[:15]
+        for r in results: r["media_type"] = "tv"
+        return results
+
+    async def get_top_anime(self) -> List[Dict[str, Any]]:
+        import datetime
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        data = await self._get("/discover/tv", {
+            "sort_by": "popularity.desc",
+            "first_air_date.lte": today,
+            "with_genres": "16", # 16 is Animation
+            "with_original_language": "ja", # Japanese audio (Anime)
+            "vote_count.gte": 50
+        })
+        results = data.get("results", [])[:15]
+        for r in results: r["media_type"] = "tv"
+        return results
 
 tmdb_client = TMDBClient()
