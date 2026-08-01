@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     def youtube_keys(self) -> list[str]:
         return [k.strip() for k in self.youtube_api_key.split(",")] if self.youtube_api_key else []
 
+    # ── VIP Cinema ──────────────────────────────────────────
+    vip_password: str = ""
+
     # ── Provider Toggles ────────────────────────────────────
     provider_local_enabled: bool = True
     provider_pexels_enabled: bool = True
