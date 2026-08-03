@@ -20,6 +20,10 @@
         }
 
         .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
             text-align: center;
             margin-bottom: 40px;
             margin-top: 20px;
@@ -308,14 +312,70 @@
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        .kick-logo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .kick-logo-container:nth-child(3) {
+            animation-delay: 1.5s;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .kick-neon-text {
+            color: #53ff45;
+            font-weight: 800;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            text-shadow: 0 0 5px #53ff45, 0 0 10px #53ff45, 0 0 20px #10b981;
+            margin-bottom: 8px;
+            letter-spacing: 2px;
+        }
+
+        .kick-logo-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #53ff45;
+            box-shadow: 0 0 15px rgba(83, 255, 69, 0.5);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .kick-logo-img:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 25px rgba(83, 255, 69, 0.8);
+        }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <h1>KickTV Queen</h1>
-        <p style="color: #94a3b8; font-size: 1.1rem;">Buscador automático de Películas y Series</p>
-        <a href="/vip" style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: linear-gradient(135deg, #10b981, #53ff45); color: black; font-weight: bold; border-radius: 20px; text-decoration: none; box-shadow: 0 4px 15px rgba(83,255,69,0.3);">👑 Acceso VIP</a>
+        <div class="kick-logo-container">
+            <div class="kick-neon-text">kick</div>
+            <a href="https://kick.com/craulox" target="_blank">
+                <img src="/static/kick-logos/CRaulox.webp" alt="CRaulox" class="kick-logo-img">
+            </a>
+        </div>
+        <div>
+            <h1>KickTV Queen</h1>
+            <p style="color: #94a3b8; font-size: 1.1rem; margin: 5px 0 0 0;">Buscador automático de Películas y Series</p>
+            <a href="/vip" style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: linear-gradient(135deg, #10b981, #53ff45); color: black; font-weight: bold; border-radius: 20px; text-decoration: none; box-shadow: 0 4px 15px rgba(83,255,69,0.3);">👑 Acceso VIP</a>
+        </div>
+        <div class="kick-logo-container">
+            <div class="kick-neon-text">kick</div>
+            <a href="https://kick.com/tototooony" target="_blank">
+                <img src="/static/kick-logos/TOTOTOOONY.webp" alt="TOTOTOOONY" class="kick-logo-img">
+            </a>
+        </div>
     </div>
 
     <div class="queue-container">
