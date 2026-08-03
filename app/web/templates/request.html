@@ -447,10 +447,18 @@
 
             results.forEach(item => {
                 const isTv = item.media_type === 'tv';
+                const isAnime = item.original_language === 'ja' && item.genre_ids && item.genre_ids.includes(16);
                 const title = isTv ? item.name : item.title;
                 const poster = item.poster_path 
                     ? `https://image.tmdb.org/t/p/w300${item.poster_path}` 
                     : 'https://via.placeholder.com/300x450/1e293b/475569?text=Sin+Portada';
+                
+                let typeText = isTv ? '📺 Serie' : '🎬 Película';
+                let typeColor = isTv ? '#c084fc' : '#38bdf8';
+                if (isAnime) {
+                    typeText = '🎌 Anime';
+                    typeColor = '#f43f5e';
+                }
                 
                 const dateStr = item.release_date || item.first_air_date || '';
                 let statusLabel = '';
@@ -486,7 +494,7 @@
                 card.innerHTML = `
                     <img src="${poster}" alt="Poster">
                     <div class="card-info">
-                        <div class="card-type" style="color: ${isTv ? '#c084fc' : '#38bdf8'}">${isTv ? '📺 Serie' : '🎬 Película'}</div>
+                        <div class="card-type" style="color: ${typeColor}">${typeText}</div>
                         <h3 class="card-title">${title}</h3>
                         <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center;">${dateStr.split('-')[0]}${statusLabel}</div>
                     </div>

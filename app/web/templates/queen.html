@@ -381,6 +381,7 @@
     <!-- Fullscreen Player -->
     <div id="player-container">
         <button id="close-player" onclick="closePlayer()">×</button>
+        <button id="enter-room-btn" style="display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10000; padding: 15px 40px; font-size: 1.3rem; background: linear-gradient(135deg, #a855f7, #c084fc); border: none; border-radius: 50px; color: white; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(168, 85, 247, 0.5); transition: transform 0.2s;" onclick="enterRoom()" onmouseover="this.style.transform='translateX(-50%) scale(1.05)'" onmouseout="this.style.transform='translateX(-50%) scale(1)'">🚪 Entrar a Sala</button>
         <iframe id="video-iframe" allowfullscreen allow="autoplay; fullscreen"></iframe>
     </div>
 
@@ -394,6 +395,7 @@
         
         let timeout = null;
         let selectedTvShow = null;
+        let currentTrailerItem = null;
 
         window.onload = () => {
             // 1. Now Playing (Future/Trailers)
@@ -449,12 +451,13 @@
             combined.forEach(item => {
                 const title = item.title || item.name;
                 const isTv = item.media_type === 'tv';
+                const isAnime = item.original_language === 'ja' && item.genre_ids && item.genre_ids.includes(16);
                 
                 let typeText = isTv ? '📺 Serie' : '🎬 Película';
                 let typeColor = isTv ? '#c084fc' : '#53ff45';
                 
                 // If it's the anime track, we know it's anime
-                if (trackId === 'track-anime') {
+                if (trackId === 'track-anime' || isAnime) {
                     typeText = '🎌 Anime';
                     typeColor = '#f43f5e'; // Rose color for anime
                 }
@@ -466,6 +469,7 @@
                 const card = document.createElement('div');
                 card.className = 'carousel-card';
                 item.isFuture = forceFuture; 
+                if (forceFuture) item.isProcesoAnuncio = true;
                 card.onclick = () => handleSelect(item);
                 
                 card.innerHTML = `
@@ -518,10 +522,18 @@
 
             results.forEach(item => {
                 const isTv = item.media_type === 'tv';
+                const isAnime = item.original_language === 'ja' && item.genre_ids && item.genre_ids.includes(16);
                 const title = isTv ? item.name : item.title;
                 const poster = item.poster_path 
                     ? `https://image.tmdb.org/t/p/w300${item.poster_path}` 
                     : 'https://via.placeholder.com/300x450/1e293b/475569?text=Sin+Portada';
+                
+                let typeText = isTv ? '📺 Serie' : '🎬 Película';
+                let typeColor = isTv ? '#c084fc' : '#53ff45';
+                if (isAnime) {
+                    typeText = '🎌 Anime';
+                    typeColor = '#f43f5e';
+                }
                 
                 const dateStr = item.release_date || item.first_air_date || '';
                 let statusLabel = '';
@@ -546,6 +558,7 @@
                         statusLabel = '<span style="background: #a855f7; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 5px;">Proceso-ANUNCIO</span>';
                         borderStyle = 'border: 2px solid #a855f7;';
                         item.isFuture = true;
+                        item.isProcesoAnuncio = true;
                     }
                 }
                 
@@ -557,7 +570,7 @@
                 card.innerHTML = `
                     <img src="${poster}" alt="Poster">
                     <div class="card-info">
-                        <div class="card-type" style="color: ${isTv ? '#c084fc' : '#53ff45'}">${isTv ? '📺 Serie' : '🎬 Película'}</div>
+                        <div class="card-type" style="color: ${typeColor}">${typeText}</div>
                         <h3 class="card-title">${title}</h3>
                         <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center;">${dateStr.split('-')[0]}${statusLabel}</div>
                     </div>
@@ -582,6 +595,8 @@
                             if (url.includes('youtube.com')) {
                                 url += '&vq=hd1080';
                             }
+                            currentTrailerItem = item;
+                            document.getElementById('enter-room-btn').style.display = item.isProcesoAnuncio ? 'block' : 'none';
                             openPlayer(url);
                         } else {
                             alert("No se encontró tráiler para esta película/serie.");
@@ -696,6 +711,49 @@
             videoIframe.src = '';
             playerContainer.style.display = 'none';
             document.body.style.overflow = 'auto'; // restore scrolling
+            document.getElementById('enter-room-btn').style.display = 'none';
+            currentTrailerItem = null;
+        }
+
+        function enterRoom() {
+            if (!currentTrailerItem) return;
+            const item = currentTrailerItem;
+            closePlayer(); // Close the trailer
+            
+            // Proceed to play actual content
+            const isTv = item.media_type === 'tv';
+            if (isTv) {
+                selectedTvShow = item;
+                document.getElementById('modal-title').innerText = item.name || item.title;
+                
+                const sSelect = document.getElementById('tv-season');
+                const eSelect = document.getElementById('tv-episode');
+                sSelect.innerHTML = '<option>Cargando...</option>';
+                eSelect.innerHTML = '<option>Cargando...</option>';
+                sSelect.disabled = true;
+                eSelect.disabled = true;
+                document.getElementById('tv-modal').style.display = 'flex';
+                
+                fetch(`/api/tmdb/tv/${item.id}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.success && data.details && data.details.seasons) {
+                            tvSeasonsData = data.details.seasons.filter(s => s.season_number > 0);
+                            populateSeasons();
+                        } else {
+                            alert("Error al cargar detalles de la serie.");
+                            closeModal();
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert("Error de red.");
+                        closeModal();
+                    });
+            } else {
+                const url = `https://unlimplay.com/f/embed/movie/${item.id}?autoplay=1`;
+                openPlayer(url);
+            }
         }
     </script>
 </body>
