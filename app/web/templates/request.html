@@ -661,10 +661,73 @@
             setTimeout(() => { toast.style.bottom = '-100px'; }, 4000);
         }
     </script>
-    
     <!-- Background Music Player -->
-    <div style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; opacity: 0.1; transition: opacity 0.3s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.1">
-        <iframe width="200" height="113" src="https://www.youtube.com/embed/videoseries?list=UUphgohC7NIotJNHyfJUmnIX&autoplay=1&loop=1&index=0" frameborder="0" allow="autoplay" allowfullscreen></iframe>
+    <div style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; align-items: flex-end; gap: 10px;">
+        <button id="music-toggle-btn" onclick="toggleMusic()" style="padding: 10px 15px; border-radius: 20px; background: rgba(16, 185, 129, 0.8); color: white; border: none; font-weight: bold; cursor: pointer; backdrop-filter: blur(5px); box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: all 0.3s;">
+            🎵 Reproducir Música
+        </button>
+        <div id="bg-music-player" style="opacity: 0.1; transition: opacity 0.3s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.1"></div>
     </div>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        let ytPlayer;
+        let isMusicPlaying = false;
+        let clickHandlerAdded = false;
+
+        function onYouTubeIframeAPIReady() {
+            ytPlayer = new YT.Player('bg-music-player', {
+                height: '113',
+                width: '200',
+                playerVars: {
+                    listType: 'playlist',
+                    list: 'UUphgohC7NIotJNHyfJUmnIX',
+                    loop: 1,
+                    controls: 1
+                },
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            event.target.unMute();
+            event.target.setVolume(50);
+            
+            // Wait for user interaction to autoplay
+            if (!clickHandlerAdded) {
+                document.body.addEventListener('click', () => {
+                    if (ytPlayer && typeof ytPlayer.playVideo === 'function' && !isMusicPlaying) {
+                        ytPlayer.playVideo();
+                    }
+                }, { once: true });
+                clickHandlerAdded = true;
+            }
+        }
+
+        function onPlayerStateChange(event) {
+            const btn = document.getElementById('music-toggle-btn');
+            if (event.data == YT.PlayerState.PLAYING) {
+                isMusicPlaying = true;
+                btn.innerText = '⏸️ Pausar Música';
+                btn.style.background = 'rgba(239, 68, 68, 0.8)';
+            } else if (event.data == YT.PlayerState.PAUSED || event.data == YT.PlayerState.ENDED) {
+                isMusicPlaying = false;
+                btn.innerText = '🎵 Reproducir Música';
+                btn.style.background = 'rgba(16, 185, 129, 0.8)';
+            }
+        }
+
+        function toggleMusic() {
+            if (!ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
+            if (isMusicPlaying) {
+                ytPlayer.pauseVideo();
+            } else {
+                ytPlayer.playVideo();
+            }
+        }
+    </script>
 </body>
 </html>
