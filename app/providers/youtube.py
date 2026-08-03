@@ -125,9 +125,9 @@ class YouTubeProvider(BaseProvider):
                 snippet = snippets[vid]
                 dur = durations.get(vid, 60)
                 
-                # Usar iframe embebido en lugar de descargar
+                # Usar iframe embebido en lugar de descargar, forzando la mejor calidad posible (4K/8K si está disponible)
                 res = VideoResult(
-                    url=f"https://www.youtube.com/embed/{vid}?autoplay=1&controls=0",
+                    url=f"https://www.youtube.com/embed/{vid}?autoplay=1&controls=0&vq=hd2160",
                     title=snippet.get("title", "YouTube Video"),
                     duration=dur,
                     author=snippet.get("channelTitle", "YouTube"),
@@ -158,7 +158,7 @@ class YouTubeProvider(BaseProvider):
         try:
             cmd = [
                 "yt-dlp",
-                "-f", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/b[height<=720][ext=mp4]/b",
+                "-f", "bestvideo+bestaudio/best",
                 "--merge-output-format", "mp4",
                 "-o", str(file_path),
                 "--no-warnings",
