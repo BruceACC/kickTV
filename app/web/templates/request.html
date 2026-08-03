@@ -676,20 +676,29 @@
         let clickHandlerAdded = false;
 
         function onYouTubeIframeAPIReady() {
-            ytPlayer = new YT.Player('bg-music-player', {
-                height: '113',
-                width: '200',
-                videoId: 'BsuFR4OR8sQ',
-                playerVars: {
-                    playlist: 'BsuFR4OR8sQ,TJLGWZT6O5s,-cXUGAFSMpo,ai11onkXyZg',
-                    loop: 1,
-                    controls: 1
-                },
-                events: {
-                    'onReady': onPlayerReady,
-                    'onStateChange': onPlayerStateChange
-                }
-            });
+            fetch('/api/youtube/channel_music')
+                .then(res => res.json())
+                .then(data => {
+                    const videos = data.videos || ['BsuFR4OR8sQ'];
+                    const firstVideo = videos[0];
+                    const playlistStr = videos.join(',');
+
+                    ytPlayer = new YT.Player('bg-music-player', {
+                        height: '113',
+                        width: '200',
+                        videoId: firstVideo,
+                        playerVars: {
+                            playlist: playlistStr,
+                            loop: 1,
+                            controls: 1
+                        },
+                        events: {
+                            'onReady': onPlayerReady,
+                            'onStateChange': onPlayerStateChange
+                        }
+                    });
+                })
+                .catch(err => console.error("Error cargando musica de fondo", err));
         }
 
         function onPlayerReady(event) {

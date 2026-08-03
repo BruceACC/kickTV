@@ -219,3 +219,31 @@ async def login_vip(req: LoginRequest):
         return {"success": True}
     
     raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+
+# ── Custom Features ─────────────────────────────────────────
+
+@router.get("/youtube/channel_music")
+async def get_channel_music():
+    """Fetch latest videos from the custom background music channel."""
+    import aiohttp
+    import xml.etree.ElementTree as ET
+    url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCphgohC7NIotJNHyfJUmnIX"
+    video_ids = []
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=5) as resp:
+                if resp.status == 200:
+                    content = await resp.text()
+                    root = ET.fromstring(content)
+                    ns = {"yt": "http://www.youtube.com/xml/schemas/2015", "atom": "http://www.w3.org/2005/Atom"}
+                    for entry in root.findall("atom:entry", ns):
+                        vid = entry.find("yt:videoId", ns)
+                        if vid is not None and vid.text:
+                            video_ids.append(vid.text)
+    except Exception as e:
+        logger.error(f"Error fetching channel music: {e}")
+    
+    if not video_ids:
+        video_ids = ['BsuFR4OR8sQ', 'TJLGWZT6O5s', '-cXUGAFSMpo', 'ai11onkXyZg']
+        
+    return {"success": True, "videos": video_ids}
