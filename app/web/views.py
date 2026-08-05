@@ -18,15 +18,33 @@ web_router = APIRouter(tags=["web"])
 
 
 @web_router.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request) -> HTMLResponse:
-    """Redirect main page to the TV Player."""
+async def dashboard(request: Request):
+    """Redirect main page to the M3U8 Player."""
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/tv")
+    return RedirectResponse(url="/tv.m3u8")
 
-@web_router.get("/tv", response_class=HTMLResponse)
-async def tv_player_page(request: Request) -> HTMLResponse:
-    """Web TV Player for OBS Studio."""
-    return templates.TemplateResponse("player.html", {"request": request})
+@web_router.get("/tv.m3u8")
+@web_router.get("/tv")
+async def tv_player_m3u8(request: Request):
+    """M3U8 Playlist for OBS Studio/VLC."""
+    from fastapi.responses import PlainTextResponse
+    
+    base_url = str(request.base_url).rstrip("/")
+    stream_url = f"{base_url}/api/player/next.mp4"
+    
+    lines = [
+        "#EXTM3U",
+        "#EXTINF:-1,KickTV Stream (Activa 'Bucle' en OBS para TV 24/7)",
+        stream_url
+    ]
+        
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+    }
+    
+    return PlainTextResponse("\n".join(lines), media_type="application/vnd.apple.mpegurl", headers=headers)
 
 @web_router.get("/queen", response_class=HTMLResponse)
 async def queen_page(request: Request) -> HTMLResponse:

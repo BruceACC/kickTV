@@ -125,9 +125,8 @@ class YouTubeProvider(BaseProvider):
                 snippet = snippets[vid]
                 dur = durations.get(vid, 60)
                 
-                # Usar iframe embebido en lugar de descargar, forzando la mejor calidad posible (4K/8K si está disponible)
                 res = VideoResult(
-                    url=f"https://www.youtube.com/embed/{vid}?autoplay=1&controls=0&vq=hd2160",
+                    url=f"https://www.youtube.com/watch?v={vid}",
                     title=snippet.get("title", "YouTube Video"),
                     duration=dur,
                     author=snippet.get("channelTitle", "YouTube"),
@@ -136,7 +135,7 @@ class YouTubeProvider(BaseProvider):
                     thumbnail=snippet.get("thumbnails", {}).get("high", {}).get("url", ""),
                     video_id=generate_video_id("youtube", vid),
                     license="unknown",
-                    is_iframe=True
+                    is_iframe=False
                 )
                 results.append(res)
             return results
@@ -230,6 +229,9 @@ class YouTubeProvider(BaseProvider):
         return await self.random()
 
     async def validate_video(self, video: VideoResult) -> bool:
-        """YouTube videos are now served as iframes directly from the Web Player. No download needed."""
-        # Al marcarlo como iframe, el frontend de OBS lo reproduce nativamente
-        return True
+        """Download the video so OBS VLC can stream it."""
+        file_path = await self._download_video(video.url, video.video_id)
+        if file_path:
+            video.file_path = file_path
+            return True
+        return False

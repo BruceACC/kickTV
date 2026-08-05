@@ -78,11 +78,11 @@ class TMDBClient:
 
     async def get_movie_details(self, tmdb_id: int) -> Dict[str, Any]:
         """Get movie details including runtime."""
-        return await self._get(f"/movie/{tmdb_id}")
+        return await self._get(f"/movie/{tmdb_id}", {"append_to_response": "credits,videos,similar,recommendations,external_ids,release_dates,keywords,reviews,images", "include_image_language": "es,en,null"})
 
     async def get_tv_details(self, tmdb_id: int) -> Dict[str, Any]:
         """Get TV details (runtime is usually an array of episode runtimes)."""
-        return await self._get(f"/tv/{tmdb_id}")
+        return await self._get(f"/tv/{tmdb_id}", {"append_to_response": "credits,videos,similar,recommendations,external_ids,content_ratings,keywords,reviews,images", "include_image_language": "es,en,null"})
 
     async def get_top_movies(self) -> List[Dict[str, Any]]:
         import datetime
@@ -122,5 +122,69 @@ class TMDBClient:
         results = data.get("results", [])[:15]
         for r in results: r["media_type"] = "tv"
         return results
+
+    async def get_now_playing_theaters(self) -> List[Dict[str, Any]]:
+        data = await self._get("/movie/now_playing", {"region": "US"})
+        results = data.get("results", [])[:20]
+        for r in results: r["media_type"] = "movie"
+        return results
+
+    async def get_upcoming_movies(self) -> List[Dict[str, Any]]:
+        data = await self._get("/movie/upcoming", {"region": "US"})
+        results = data.get("results", [])[:20]
+        for r in results: r["media_type"] = "movie"
+        return results
+
+    async def get_trending_all(self) -> List[Dict[str, Any]]:
+        data = await self._get("/trending/all/day")
+        return data.get("results", [])[:20]
+
+    async def get_popular_movies(self) -> List[Dict[str, Any]]:
+        data = await self._get("/movie/popular")
+        results = data.get("results", [])[:20]
+        for r in results: r["media_type"] = "movie"
+        return results
+
+    async def get_popular_series(self) -> List[Dict[str, Any]]:
+        data = await self._get("/tv/popular")
+        results = data.get("results", [])[:20]
+        for r in results: r["media_type"] = "tv"
+        return results
+
+    async def get_popular_anime(self) -> List[Dict[str, Any]]:
+        data = await self._get("/discover/tv", {
+            "sort_by": "popularity.desc",
+            "with_genres": "16",
+            "with_original_language": "ja"
+        })
+        results = data.get("results", [])[:20]
+        for r in results: r["media_type"] = "tv"
+        return results
+
+    async def get_airing_today_series(self) -> List[Dict[str, Any]]:
+        data = await self._get("/tv/airing_today")
+        results = data.get("results", [])[:20]
+        for r in results: r["media_type"] = "tv"
+        return results
+
+    async def get_on_the_air_series(self) -> List[Dict[str, Any]]:
+        data = await self._get("/tv/on_the_air")
+        results = data.get("results", [])[:20]
+        for r in results: r["media_type"] = "tv"
+        return results
+
+    async def get_genre_list(self, media_type: str) -> List[Dict[str, Any]]:
+        data = await self._get(f"/genre/{media_type}/list")
+        return data.get("genres", [])
+
+    async def discover(self, media_type: str, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
+        data = await self._get(f"/discover/{media_type}", filters)
+        results = data.get("results", [])
+        for r in results: r["media_type"] = media_type
+        return results
+
+    async def get_movie_videos(self, tmdb_id: int) -> List[Dict[str, Any]]:
+        data = await self._get(f"/movie/{tmdb_id}/videos")
+        return data.get("results", [])
 
 tmdb_client = TMDBClient()

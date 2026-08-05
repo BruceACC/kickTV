@@ -82,6 +82,84 @@ async def get_top_anime():
     if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
     return {"success": True, "results": await tmdb_client.get_top_anime()}
 
+@router.get("/tmdb/now_playing_theaters")
+async def get_now_playing_theaters():
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    return {"success": True, "results": await tmdb_client.get_now_playing_theaters()}
+
+@router.get("/tmdb/upcoming")
+async def get_upcoming_movies():
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    return {"success": True, "results": await tmdb_client.get_upcoming_movies()}
+
+@router.get("/tmdb/trending")
+async def get_trending_all():
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    return {"success": True, "results": await tmdb_client.get_trending_all()}
+
+@router.get("/tmdb/popular/movies")
+async def get_popular_movies():
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    return {"success": True, "results": await tmdb_client.get_popular_movies()}
+
+@router.get("/tmdb/popular/series")
+async def get_popular_series():
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    return {"success": True, "results": await tmdb_client.get_popular_series()}
+
+@router.get("/tmdb/popular/anime")
+async def get_popular_anime_new():
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    return {"success": True, "results": await tmdb_client.get_popular_anime()}
+
+@router.get("/tmdb/airing_today")
+async def get_airing_today_series():
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    return {"success": True, "results": await tmdb_client.get_airing_today_series()}
+
+@router.get("/tmdb/on_the_air")
+async def get_on_the_air_series():
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    return {"success": True, "results": await tmdb_client.get_on_the_air_series()}
+
+@router.get("/tmdb/genres/{media_type}")
+async def get_genre_list(media_type: str):
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    return {"success": True, "genres": await tmdb_client.get_genre_list(media_type)}
+
+@router.get("/tmdb/discover")
+async def discover(
+    media_type: str = Query(..., alias="type"),
+    genre: Optional[str] = None,
+    year: Optional[str] = None,
+    sort_by: str = "popularity.desc"
+):
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    filters = {"sort_by": sort_by}
+    if genre:
+        filters["with_genres"] = genre
+    if year:
+        if media_type == "movie":
+            filters["primary_release_year"] = year
+        else:
+            filters["first_air_date_year"] = year
+            
+    return {"success": True, "results": await tmdb_client.discover(media_type, filters)}
+
+@router.get("/tmdb/movie/{tmdb_id}/videos")
+async def get_movie_videos(tmdb_id: int):
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    return {"success": True, "results": await tmdb_client.get_movie_videos(tmdb_id)}
+
+@router.get("/tmdb/details/{media_type}/{tmdb_id}")
+async def get_details(media_type: str, tmdb_id: int):
+    if not tmdb_client.is_configured(): raise HTTPException(status_code=500, detail="TMDB Key error")
+    if media_type == "movie":
+        return {"success": True, "results": await tmdb_client.get_movie_details(tmdb_id)}
+    else:
+        return {"success": True, "results": await tmdb_client.get_tv_details(tmdb_id)}
+
+
 @router.get("/youtube/trailer")
 async def get_youtube_trailer(query: str = Query(..., min_length=2)):
     """Search YouTube for a trailer and return the video URL."""
@@ -201,6 +279,33 @@ async def get_next_video() -> dict:
         "author": video.author,
         "category": video.category.value
     }
+
+@router.get("/player/next.mp4")
+async def get_next_video_stream():
+    """Stream the next video directly to VLC/OBS."""
+    from fastapi.responses import FileResponse
+    video = await queue.next()
+    
+    if not video:
+        raise HTTPException(status_code=404, detail="No videos available in queue")
+        
+    # If it's an iframe, we can't stream it as an mp4 file
+    if video.is_iframe or not video.file_path:
+        # Just return a 404 or maybe loop until we find a valid one?
+        # Let's skip and get the next valid one
+        for _ in range(5):
+            video = await queue.next()
+            if video and not video.is_iframe and video.file_path:
+                break
+        if not video or video.is_iframe or not video.file_path:
+            raise HTTPException(status_code=404, detail="No valid video files in queue")
+            
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+    }
+    return FileResponse(video.file_path, media_type="video/mp4", headers=headers)
 
 
 # ── VIP Auth ────────────────────────────────────────────────
