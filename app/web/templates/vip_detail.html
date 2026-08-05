@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cine VIP - Detalles</title>
+    
+    <!-- Plyr (Reproductor Limpio para YouTube) -->
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+        
+        :root {
+            --bg: #050505;
+            --surface: #121212;
+            --primary: #53ff45;
+            --primary-hover: #45d939;
+            --text: #ffffff;
+            --text-muted: #94a3b8;
+            --glass: rgba(5, 5, 5, 0.75);
+            --transition: 0.3s ease;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* --- NAVBAR --- */
+        .navbar {
+            position: fixed;
+            top: 0; left: 0; width: 100%; padding: 20px 4%;
+            display: flex; align-items: center; z-index: 1000;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            box-sizing: border-box;
+        }
+        .brand {
+            font-size: 1.8rem; font-weight: 800; color: var(--primary);
+            margin-right: 40px; cursor: pointer; text-decoration: none;
+            text-shadow: 0 0 10px rgba(83, 255, 69, 0.3);
+        }
+        .nav-links a {
+            color: #e5e5e5; font-size: 0.9rem; font-weight: 600;
+            cursor: pointer; text-decoration: none; transition: color var(--transition);
+            margin-right: 20px;
+        }
+        .nav-links a:hover { color: var(--primary); }
+
+        /* --- VIP LAYOUT --- */
+        .vip-container {
+            margin-top: 100px;
+            padding: 20px 4%;
+            display: grid;
+            grid-template-columns: 1fr 50vw;
+            gap: 40px;
+            min-height: calc(100vh - 100px);
+        }
+        
+        @media(max-width: 1100px) {
+            .vip-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto;
+            }
+        }
+
+        .vip-info {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .vip-player-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .player-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .player-wrapper iframe {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            border: none;
+        }
+
+        .vip-title {
+            font-size: 3rem;
+            font-weight: 800;
+            margin: 0;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
+        }
+
+        .vip-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            align-items: center;
+        }
+        
+        .vip-rating {
+            color: #fbbf24;
+            font-weight: 800;
+        }
+
+        .vip-overview {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #d1d5db;
+        }
+
+        .meta-item {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 10px;
+            font-size: 0.95rem;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding-top: 10px;
+        }
+        .meta-label {
+            color: var(--text-muted);
+        }
+        .meta-value {
+            color: var(--text);
+        }
+
+        .trailer-wrapper {
+            margin-top: 30px;
+            max-width: 600px;
+        }
+
+        /* --- TV SELECTOR --- */
+        .tv-controls {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .select-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .select-group select {
+            background: #222;
+            color: white;
+            border: 1px solid #333;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-family: 'Outfit';
+            font-size: 1rem;
+            flex: 1;
+            outline: none;
+        }
+        
+        .bg-image {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover;
+            z-index: -2;
+            opacity: 0.3;
+            filter: blur(10px);
+        }
+        
+        .cast-marquee {
+            display: flex;
+            overflow: hidden;
+            gap: 15px;
+            width: 100%;
+        }
+        .cast-marquee:hover .cast-track {
+            animation-play-state: paused;
+        }
+        .cast-track {
+            display: flex;
+            gap: 15px;
+            animation: marquee 20s linear infinite;
+            min-width: max-content;
+        }
+        @keyframes marquee {
+            from { transform: translateX(0); }
+            to { transform: translateX(calc(-100% - 15px)); }
+        }
+        .cast-card {
+            flex: 0 0 100px;
+            text-align: center;
+        }
+        .cast-img {
+            width: 100px; height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 8px;
+            background: #222;
+        }
+        .cast-name { font-size: 0.9rem; font-weight: 600; line-height: 1.2; }
+        .cast-char { font-size: 0.8rem; color: var(--text-muted); line-height: 1.2; }
+
+    </style>
+</head>
+<body>
+
+    <img id="bg-image" class="bg-image" src="" alt="">
+
+    <nav class="navbar">
+        <a href="/vip" class="brand">KICK TV</a>
+        <div class="nav-links">
+            <a href="/vip">Volver al Inicio</a>
+        </div>
+    </nav>
+
+    <div class="vip-container" id="vip-content" style="opacity: 0; transition: opacity 0.5s;">
+        <!-- Left: Info -->
+        <div class="vip-info">
+            <h1 class="vip-title" id="v-title">Cargando...</h1>
+            <div class="vip-meta" id="v-meta"></div>
+            
+            <p class="vip-overview" id="v-overview"></p>
+            
+            <div class="meta-item">
+                <div class="meta-label">Géneros</div>
+                <div class="meta-value" id="v-genres"></div>
+            </div>
+            
+            <div class="meta-item" id="cast-section" style="display: none; border:none;">
+                <div class="meta-label" style="margin-bottom:10px;">Reparto Principal</div>
+                <div class="meta-value cast-marquee" style="grid-column: 1/-1;">
+                    <div class="cast-track" id="v-cast-1"></div>
+                    <div class="cast-track" id="v-cast-2" aria-hidden="true"></div>
+                </div>
+            </div>
+            
+            <div id="v-trailer-container" class="trailer-wrapper"></div>
+        </div>
+
+        <!-- Right: Player -->
+        <div class="vip-player-section">
+            <div class="player-wrapper">
+                <iframe id="v-player" src="" allowfullscreen allow="autoplay; fullscreen"></iframe>
+            </div>
+            
+            <div id="tv-controls-container" class="tv-controls" style="display: none;">
+                <h3 style="margin:0;">Seleccionar Episodio</h3>
+                <div class="select-group">
+                    <select id="season-select" onchange="onSeasonChange()"></select>
+                </div>
+                <div class="select-group">
+                    <select id="episode-select" onchange="onEpisodeChange()"></select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const mediaType = "{{ media_type }}";
+        const tmdbId = "{{ tmdb_id }}";
+        
+        let tvSeasonsData = [];
+        let currentSeason = 1;
+        let currentEpisode = 1;
+
+        async function fetchAPI(url) {
+            try {
+                const r = await fetch(url);
+                const d = await r.json();
+                return d.success ? d.results || d.details || d : null;
+            } catch(e) {
+                console.error("API error", e);
+                return null;
+            }
+        }
+
+        async function init() {
+            const data = await fetchAPI(`/api/tmdb/details/${mediaType}/${tmdbId}`);
+            if(!data) {
+                alert("Error al cargar la información");
+                window.location.href = "/vip";
+                return;
+            }
+
+            const isTv = mediaType === 'tv';
+            const title = isTv ? data.name : data.title;
+            const date = data.release_date || data.first_air_date || '';
+            const year = date ? date.split('-')[0] : '';
+            const backdrop = data.backdrop_path ? `https://image.tmdb.org/t/p/original${data.backdrop_path}` : '';
+            const runtime = data.runtime ? `${data.runtime} min` : (data.episode_run_time && data.episode_run_time.length > 0 ? `${data.episode_run_time[0]} min` : '');
+            
+            // Set Background
+            if(backdrop) {
+                document.getElementById('bg-image').src = backdrop;
+            }
+
+            // Populate Info
+            document.getElementById('v-title').innerText = title;
+            document.getElementById('v-overview').innerText = data.overview || 'Sin descripción disponible.';
+            
+            let metaHtml = '';
+            if(data.vote_average) metaHtml += `<span class="vip-rating">★ ${data.vote_average.toFixed(1)}</span>`;
+            if(year) metaHtml += `<span>${year}</span>`;
+            if(runtime) metaHtml += `<span>${runtime}</span>`;
+            document.getElementById('v-meta').innerHTML = metaHtml;
+
+            if(data.genres) {
+                document.getElementById('v-genres').innerText = data.genres.map(g => g.name).join(', ');
+            }
+
+            // Cast
+            if(data.credits && data.credits.cast && data.credits.cast.length > 0) {
+                document.getElementById('cast-section').style.display = 'grid';
+                const castContainer1 = document.getElementById('v-cast-1');
+                const castContainer2 = document.getElementById('v-cast-2');
+                const topCast = data.credits.cast.slice(0, 10);
+                
+                let castHtml = '';
+                topCast.forEach(actor => {
+                    const img = actor.profile_path ? `https://image.tmdb.org/t/p/w185${actor.profile_path}` : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+                    castHtml += `
+                        <div class="cast-card">
+                            <img src="${img}" class="cast-img" alt="${actor.name}">
+                            <div class="cast-name">${actor.name}</div>
+                            <div class="cast-char">${actor.character}</div>
+                        </div>
+                    `;
+                });
+                
+                castContainer1.innerHTML = castHtml;
+                castContainer2.innerHTML = castHtml;
+            }
+
+            // Trailer
+            if(data.videos && data.videos.results) {
+                let trailer = data.videos.results.find(v => v.type === 'Trailer' && v.site === 'YouTube');
+                if(!trailer) trailer = data.videos.results.find(v => v.site === 'YouTube');
+                if(trailer) {
+                    document.getElementById('v-trailer-container').innerHTML = `
+                        <div class="meta-label" style="margin-bottom:10px;">Tráiler Oficial</div>
+                        <div class="player-wrapper plyr__video-embed" id="player-container">
+                            <iframe src="https://www.youtube.com/embed/${trailer.key}?origin=${window.location.origin}&iv_load_policy=3&modestbranding=1&playsinline=1&showinfo=0&rel=0&enablejsapi=1&vq=hd2160" title="Trailer" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                        </div>
+                    `;
+                    
+                    // Initialize Plyr for a completely clean UI
+                    setTimeout(() => {
+                        new Plyr('#player-container', {
+                            controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'],
+                            youtube: { noCookie: false, rel: 0, showinfo: 0, iv_load_policy: 3, modestbranding: 1 }
+                        });
+                    }, 100);
+                }
+            }
+
+            // Player logic
+            if(isTv) {
+                document.getElementById('tv-controls-container').style.display = 'flex';
+                if(data.seasons) {
+                    tvSeasonsData = data.seasons.filter(s => s.season_number > 0);
+                    populateSeasonSelect();
+                }
+                updateTvPlayer();
+            } else {
+                document.getElementById('v-player').src = `https://unlimplay.com/f/embed/movie/${tmdbId}?autoplay=1`;
+            }
+
+            document.getElementById('vip-content').style.opacity = '1';
+        }
+
+        function populateSeasonSelect() {
+            const sSelect = document.getElementById('season-select');
+            sSelect.innerHTML = '';
+            tvSeasonsData.forEach(season => {
+                const opt = document.createElement('option');
+                opt.value = season.season_number;
+                opt.innerText = `Temporada ${season.season_number}`;
+                sSelect.appendChild(opt);
+            });
+            populateEpisodeSelect();
+        }
+
+        function onSeasonChange() {
+            currentSeason = parseInt(document.getElementById('season-select').value);
+            populateEpisodeSelect();
+            currentEpisode = 1;
+            updateTvPlayer();
+        }
+
+        function populateEpisodeSelect() {
+            const season = tvSeasonsData.find(s => s.season_number === currentSeason);
+            const eSelect = document.getElementById('episode-select');
+            eSelect.innerHTML = '';
+            if(season) {
+                for(let i = 1; i <= season.episode_count; i++) {
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.innerText = `Episodio ${i}`;
+                    eSelect.appendChild(opt);
+                }
+            }
+        }
+
+        function onEpisodeChange() {
+            currentEpisode = parseInt(document.getElementById('episode-select').value);
+            updateTvPlayer();
+        }
+
+        function updateTvPlayer() {
+            document.getElementById('v-player').src = `https://unlimplay.com/f/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}?autoplay=1`;
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

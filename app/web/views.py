@@ -62,3 +62,19 @@ async def vip_page(request: Request) -> HTMLResponse:
         return templates.TemplateResponse("login.html", {"request": request})
         
     return templates.TemplateResponse("queen.html", {"request": request})
+
+@web_router.get("/vip/{media_type}/{tmdb_id}", response_class=HTMLResponse)
+async def vip_detail_page(request: Request, media_type: str, tmdb_id: int) -> HTMLResponse:
+    """Detailed VIP page for a specific movie or series."""
+    from app.config import settings
+    vip_code = request.cookies.get("vip_code", "")
+    
+    # Check if a password is set and it doesn't match the cookie
+    if settings.vip_password and vip_code != settings.vip_password:
+        return templates.TemplateResponse("login.html", {"request": request})
+        
+    return templates.TemplateResponse("vip_detail.html", {
+        "request": request,
+        "media_type": media_type,
+        "tmdb_id": tmdb_id
+    })
