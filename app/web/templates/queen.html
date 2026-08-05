@@ -1144,12 +1144,14 @@
 
         let currentTvSeason = 1;
         let currentTvEpisode = 1;
+        let viewingTvSeason = 1;
 
         function playTvShow() {
             const s = document.getElementById('tv-season').value;
             const e = document.getElementById('tv-episode').value;
             currentTvSeason = parseInt(s);
             currentTvEpisode = parseInt(e);
+            viewingTvSeason = currentTvSeason;
             const url = `https://unlimplay.com/f/embed/tv/${currentItem.id}/${s}/${e}?autoplay=1`;
             closeTvModal();
             openPlayer(url, true);
@@ -1179,16 +1181,18 @@
             sidebarTitle.innerText = currentItem.name;
             sSelect.innerHTML = '';
             
+            viewingTvSeason = currentTvSeason;
+            
             tvSeasonsData.forEach(season => {
                 const opt = document.createElement('option');
                 opt.value = season.season_number;
                 opt.innerText = `Temporada ${season.season_number}`;
-                if(season.season_number === currentTvSeason) opt.selected = true;
+                if(season.season_number === viewingTvSeason) opt.selected = true;
                 sSelect.appendChild(opt);
             });
             
             sSelect.onchange = (e) => {
-                currentTvSeason = parseInt(e.target.value);
+                viewingTvSeason = parseInt(e.target.value);
                 renderInPlayerEpisodes();
             };
             
@@ -1198,14 +1202,15 @@
         function renderInPlayerEpisodes() {
             const eList = document.getElementById('ps-episode-list');
             eList.innerHTML = '';
-            const season = tvSeasonsData.find(s => s.season_number === currentTvSeason);
+            const season = tvSeasonsData.find(s => s.season_number === viewingTvSeason);
             const count = season ? season.episode_count : 1;
             
             for(let i=1; i<=count; i++) {
                 const epDiv = document.createElement('div');
-                epDiv.className = 'ps-ep-item' + (i === currentTvEpisode ? ' active' : '');
+                const isPlaying = (viewingTvSeason === currentTvSeason && i === currentTvEpisode);
+                epDiv.className = 'ps-ep-item' + (isPlaying ? ' active' : '');
                 epDiv.innerHTML = `<span>Episodio ${i}</span> <span>▶</span>`;
-                epDiv.onclick = () => playInPlayerTvShow(currentTvSeason, i);
+                epDiv.onclick = () => playInPlayerTvShow(viewingTvSeason, i);
                 eList.appendChild(epDiv);
             }
             
@@ -1219,6 +1224,9 @@
         function playInPlayerTvShow(season, episode) {
             currentTvSeason = season;
             currentTvEpisode = episode;
+            viewingTvSeason = season; // Sync viewing with playing
+            document.getElementById('ps-season').value = viewingTvSeason;
+            
             const url = `https://unlimplay.com/f/embed/tv/${currentItem.id}/${season}/${episode}?autoplay=1`;
             document.getElementById('video-iframe').src = url;
             renderInPlayerEpisodes();
@@ -1234,7 +1242,6 @@
                 const nextSeason = tvSeasonsData.find(s => s.season_number === currentTvSeason + 1);
                 if(nextSeason) {
                     playInPlayerTvShow(currentTvSeason + 1, 1);
-                    document.getElementById('ps-season').value = currentTvSeason + 1;
                 } else {
                     alert("Has llegado al final de la serie.");
                 }
@@ -1248,7 +1255,6 @@
                 const prevSeason = tvSeasonsData.find(s => s.season_number === currentTvSeason - 1);
                 if(prevSeason) {
                     playInPlayerTvShow(currentTvSeason - 1, prevSeason.episode_count);
-                    document.getElementById('ps-season').value = currentTvSeason - 1;
                 } else {
                     alert("Estás en el primer episodio.");
                 }
