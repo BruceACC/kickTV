@@ -19,12 +19,16 @@ web_router = APIRouter(tags=["web"])
 
 @web_router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    """Redirect main page to the M3U8 Player."""
+    """Redirect main page to the TV Player."""
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/tv.m3u8")
+    return RedirectResponse(url="/tv")
+
+@web_router.get("/tv", response_class=HTMLResponse)
+async def tv_player_page(request: Request) -> HTMLResponse:
+    """Web TV Player for OBS Studio or Web Viewers."""
+    return templates.TemplateResponse("player.html", {"request": request})
 
 @web_router.get("/tv.m3u8")
-@web_router.get("/tv")
 async def tv_player_m3u8(request: Request):
     """M3U8 Playlist for OBS Studio/VLC."""
     from fastapi.responses import PlainTextResponse

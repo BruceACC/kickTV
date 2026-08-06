@@ -363,6 +363,14 @@
     </style>
 </head>
 <body>
+    <!-- Start Screen to bypass autoplay restrictions and play music -->
+    <div id="start-screen" style="position: fixed; top:0; left:0; width:100vw; height:100vh; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(5px); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 99999; color: white;">
+        <h1 style="color: #53ff45; font-size: 4.5rem; margin-bottom: 10px; text-shadow: 0 0 10px #53ff45, 0 0 20px #53ff45, 0 0 40px #10b981, 0 0 80px #10b981; text-transform: uppercase; letter-spacing: 3px; font-weight: 800;">KICK TV</h1>
+        <p style="font-size: 1.5rem; color: #fff; margin-bottom: 40px; text-shadow: 0 0 10px rgba(255,255,255,0.8), 0 0 20px rgba(255,255,255,0.4); font-weight: 600;">Peticiones Automáticas para Queen</p>
+        <button id="start-btn" style="background: #53ff45; color: black; border: none; padding: 15px 40px; border-radius: 30px; font-size: 1.3rem; font-weight: 800; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 0 15px #53ff45, 0 0 30px #10b981; text-shadow: 0 0 5px rgba(0,0,0,0.5);">
+            ▶ Entrar a Queen
+        </button>
+    </div>
 
     <div class="header">
         <div class="kick-logo-container">
@@ -706,18 +714,25 @@
                 .catch(err => console.error("Error cargando musica de fondo", err));
         }
 
+        let userHasEntered = false;
+
         function onPlayerReady(event) {
             event.target.unMute();
             event.target.setVolume(50);
             
-            // Wait for user interaction to autoplay
-            if (!clickHandlerAdded) {
-                document.body.addEventListener('click', () => {
-                    if (ytPlayer && typeof ytPlayer.playVideo === 'function' && !isMusicPlaying) {
-                        ytPlayer.playVideo();
-                    }
-                }, { once: true });
-                clickHandlerAdded = true;
+            // If user already clicked "Entrar", play immediately
+            if (userHasEntered) {
+                if (!isMusicPlaying) ytPlayer.playVideo();
+            } else {
+                // Otherwise wait for any body click
+                if (!clickHandlerAdded) {
+                    document.body.addEventListener('click', () => {
+                        if (ytPlayer && typeof ytPlayer.playVideo === 'function' && !isMusicPlaying) {
+                            ytPlayer.playVideo();
+                        }
+                    }, { once: true });
+                    clickHandlerAdded = true;
+                }
             }
         }
 
@@ -746,6 +761,15 @@
                 ytPlayer.playVideo();
             }
         }
+
+        document.getElementById('start-btn').onclick = () => {
+            document.getElementById('start-screen').style.display = 'none';
+            userHasEntered = true;
+            // Play immediately if player is already loaded
+            if (ytPlayer && typeof ytPlayer.playVideo === 'function' && !isMusicPlaying) {
+                ytPlayer.playVideo();
+            }
+        };
     </script>
 </body>
 </html>
